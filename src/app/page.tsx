@@ -26,8 +26,7 @@ import {
 
 /**
  * 🏛️ PRODUCTION DIRECTIVE
- * Forces the page to be dynamic. Without this, Next.js caches the dashboard
- * as a static HTML file, which is why your charts previously stayed at 0.
+ * Forces the page to be dynamic. 
  */
 export const dynamic = "force-dynamic";
 
@@ -43,19 +42,18 @@ interface SerializedMember {
 
 export default async function Home() {
   /**
-   * DATA FOUNDATIONS:
-   * Parallel fetching ensures the dashboard loads all BI streams simultaneously.
-   * This is much faster than fetching them one-by-one (Waterfall).
+   * 🛠️ CONNECTION-SAFE DATA FETCHING
+   * Architecture Note: We have switched from Promise.all to sequential awaits.
+   * This prevents the "MaxClientsInSessionMode" error by ensuring only 
+   * one database connection is used at a time.
    */
-  const [members, stats, trend, peakHours, churnRisk, goal, tiers] = await Promise.all([
-    getMembers() as Promise<SerializedMember[]>,
-    getGymStats(),
-    getRevenueTrend(),
-    getPeakHoursData(),
-    getChurnRiskMembers(),
-    getRevenueGoalProgress(),
-    getMembershipDistribution()
-  ]);
+  const members = await getMembers() as SerializedMember[];
+  const stats = await getGymStats();
+  const trend = await getRevenueTrend();
+  const peakHours = await getPeakHoursData();
+  const churnRisk = await getChurnRiskMembers();
+  const goal = await getRevenueGoalProgress();
+  const tiers = await getMembershipDistribution();
 
   return (
     <div className="flex flex-col min-h-screen bg-zinc-50 font-sans dark:bg-black transition-colors">
