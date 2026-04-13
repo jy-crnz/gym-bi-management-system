@@ -1,0 +1,71 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/client" 
+}
+
+enum MembershipTier {
+  BASIC
+  PREMIUM
+  VIP
+}
+
+// DIMENSION: Member Profile (The "Who")
+model Member {
+  id              String        @id @default(cuid())
+  name            String
+  email           String        @unique
+  status          MemberStatus  @default(ACTIVE)
+  
+  // BI Enrichment Fields
+  churnRiskScore  Float         @default(0.0) 
+  totalSpent      Decimal       @default(0)
+  
+  attendance      Attendance[]
+  transactions    Transaction[]
+  
+  tier      MembershipTier @default(BASIC)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+// FACT: Attendance Logs (The "Behavior")
+model Attendance {
+  id        String    @id @default(cuid())
+  memberId  String
+  member    Member    @relation(fields: [memberId], references: [id])
+  
+  // BI Logic: checkIn is the event, createdAt is the record timestamp
+  checkIn   DateTime  @default(now())
+  checkOut  DateTime?
+  location  String    @default("Main Floor")
+  
+  // FIX: This matches the 'createdAt' in your getGymStats query!
+  createdAt DateTime  @default(now())
+}
+
+// FACT: Transactions (The "Value")
+model Transaction {
+  id        String   @id @default(cuid())
+  memberId  String
+  member    Member   @relation(fields: [memberId], references: [id])
+  amount    Decimal
+  type      String   // e.g., "Membership", "Supplement"
+  
+  createdAt DateTime @default(now())
+}
+
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+  CANCELLED
+}
+
+model SystemSettings {
+  id           String   @id @default("settings")
+  revenueGoal  Decimal  @default(50000)
+  updatedAt    DateTime @updatedAt
+}
