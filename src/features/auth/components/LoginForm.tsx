@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Lock, Mail, Loader2, AlertCircle, LockKeyhole, ChevronRight } from "lucide-react";
+import Link from "next/link"; // Added for navigation
+import { Lock, Mail, Loader2, AlertCircle, LockKeyhole, ChevronRight, UserCircle } from "lucide-react";
 
 export function LoginForm() {
     const router = useRouter();
@@ -108,6 +109,17 @@ export function LoginForm() {
                             )}
                         </div>
                     </button>
+                </div>
+
+                {/* --- NEW FEATURE: Redirect to Member Portal --- */}
+                <div className="pt-2 text-center">
+                    <Link
+                        href="/login"
+                        className="inline-flex items-center gap-2 text-[10px] font-bold text-zinc-500 uppercase tracking-widest hover:text-blue-400 transition-colors duration-200 group/link"
+                    >
+                        <UserCircle className="w-3 h-3 text-zinc-600 group-hover/link:text-blue-400 transition-colors" />
+                        Are you a member? <span className="text-zinc-400 group-hover/link:text-blue-300 ml-1 underline decoration-zinc-800 underline-offset-4">Click here</span>
+                    </Link>
                 </div>
             </form>
 
