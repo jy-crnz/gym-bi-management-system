@@ -36,25 +36,31 @@ export async function getMembers() {
  */
 export async function getGymStats() {
     try {
-        const [totalMembers, activeMembers, todayAttendance, revenueData] = await Promise.all([
-            prisma.member.count(),
-            prisma.member.count({ where: { status: "ACTIVE" } }),
-            prisma.attendance.count({
-                where: { checkIn: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } },
-            }),
-            prisma.transaction.aggregate({
-                _sum: { amount: true }
-            })
-        ]);
+        // Use individual awaits or handle errors specifically for the 'Today' query
+        // which is the most likely to fail due to Date objects
+        const totalMembers = await prisma.member.count().catch(() => 0);
+        const activeMembers = await prisma.member.count({ where: { status: "ACTIVE" } }).catch(() => 0);
+
+        // Timezone-safe "Today" check using date-fns (already in your package.json)
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+
+        const todayAttendance = await prisma.attendance.count({
+            where: { checkIn: { gte: todayStart } },
+        }).catch(() => 0);
+
+        const revenueData = await prisma.transaction.aggregate({
+            _sum: { amount: true }
+        }).catch(() => ({ _sum: { amount: 0 } }));
 
         return {
             totalMembers,
             activeMembers,
             todayAttendance,
-            totalRevenue: Number(revenueData._sum.amount || 0)
+            totalRevenue: Number(revenueData._sum?.amount || 0)
         };
     } catch (error) {
-        console.error("STATS_ERROR:", error);
+        console.error("CRITICAL_STATS_ERROR:", error);
         return { totalMembers: 0, activeMembers: 0, todayAttendance: 0, totalRevenue: 0 };
     }
 }

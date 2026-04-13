@@ -4,11 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { MemberSchema, type MemberInput } from "./schemas";
+/* 🏛️ INFORMATION ASSURANCE: Security Imports */
+import { headers } from "next/headers";
+import { loginRateLimiter } from "@/lib/ratelimit";
 
 /**
  * ARCHITECTURE IS KINDNESS: Discriminated Union
- * We export this type to satisfy the PortalLoginForm import.
- * This ensures TypeScript knows exactly what to expect from the auth handshake.
+ * Satisfies the PortalLoginForm import and ensures type-safe auth handshakes.
  */
 export type LoginResult =
     | { error: string; memberId?: never }
@@ -21,8 +23,8 @@ export type LoginResult =
  */
 
 /**
- * STRATEGY: Member Verification.
- * BI GOAL: Identify the member and return their ID for dynamic routing to /portal/[id].
+ * STRATEGY: Member Verification with Rate Limiting.
+ * IA GOAL: Prevent brute-force and email harvesting.
  */
 export async function loginAsMember(formData: FormData): Promise<LoginResult> {
     const email = formData.get("email") as string;
@@ -32,21 +34,36 @@ export async function loginAsMember(formData: FormData): Promise<LoginResult> {
     }
 
     try {
+        // ── 1. THE RADAR CHECK (Rate Limiting) ──
+        const headerList = await headers();
+        const ip = headerList.get("x-forwarded-for") || "127.0.0.1";
+
+        // Isolate member attempts from admin attempts in Redis
+        const { success } = await loginRateLimiter.limit(`member_login_${ip}`);
+
+        if (!success) {
+            return { error: "Too many attempts. Please wait 60 seconds." };
+        }
+
+        // ── 2. DATA VERIFICATION ──
         const member = await prisma.member.findUnique({
             where: { email },
             select: { id: true }
         });
 
         if (!member) {
-            return { error: "No member found with that email address." };
+            /**
+             * SECURE HANDSHAKE: Generic error prevents "Email Harvesting."
+             * We don't confirm if the email exists to protect student privacy.
+             */
+            return { error: "Invalid credentials. Access denied." };
         }
 
-        // Return the ID so the client-side router can hit the dynamic route
         return { memberId: member.id };
 
     } catch (error) {
         console.error("AUTH_QUERY_ERROR:", error);
-        return { error: "A system error occurred during verification." };
+        return { error: "A system error occurred. Please try again later." };
     }
 }
 
@@ -58,7 +75,7 @@ export async function loginAsMember(formData: FormData): Promise<LoginResult> {
 
 /**
  * STRATEGY: Create a new member with strict validation.
- * BI GOAL: Capture 'Tier' at entry for accurate segmentation analytics.
+ * BI GOAL: Revalidate the dashboard so charts reflect the new member immediately.
  */
 export async function createMember(formData: MemberInput) {
     const validatedFields = MemberSchema.safeParse(formData);
@@ -80,7 +97,7 @@ export async function createMember(formData: MemberInput) {
             },
         });
 
-        // Kindness: Update all relevant views after data entry
+        // KINDNESS: Update the Home Dashboard and Member List
         revalidatePath("/");
         revalidatePath("/dashboard/members");
 
@@ -99,7 +116,7 @@ export async function createMember(formData: MemberInput) {
 
 /**
  * BI GOAL: Track gym utilization.
- * Records the "Fact" of a visit to drive the Peak Hours & Attendance charts.
+ * Updates the 'Today's Foot Traffic' chart in real-time.
  */
 export async function logAttendance(memberId: string) {
     try {
@@ -110,7 +127,7 @@ export async function logAttendance(memberId: string) {
             },
         });
 
-        // Revalidate the dashboard and the specific portal pass
+        // KINDNESS: Trigger revalidation for BI visuals and the user's portal
         revalidatePath("/");
         revalidatePath(`/portal/${memberId}`);
 
@@ -123,8 +140,7 @@ export async function logAttendance(memberId: string) {
 
 /**
  * BI GOAL: Capture financial "Value" events.
- * Atomic Transaction: Ensures the payment fact and the member's 
- * lifetime value (LTV) stay perfectly in sync.
+ * Atomic Transaction ensures the Revenue Trend chart stays accurate.
  */
 export async function logTransaction(memberId: string, amount: number, type: string) {
     try {
@@ -138,6 +154,7 @@ export async function logTransaction(memberId: string, amount: number, type: str
             }),
         ]);
 
+        // KINDNESS: Refresh charts for Revenue Trend and Goal Progress
         revalidatePath("/");
         revalidatePath(`/portal/${memberId}`);
 
@@ -149,7 +166,7 @@ export async function logTransaction(memberId: string, amount: number, type: str
 }
 
 /**
- * BI GOAL: Secure data disposal and referential integrity.
+ * IA GOAL: Secure data disposal.
  */
 export async function deleteMember(id: string) {
     try {
@@ -158,12 +175,15 @@ export async function deleteMember(id: string) {
             prisma.transaction.deleteMany({ where: { memberId: id } }),
             prisma.member.delete({ where: { id } }),
         ]);
+
+        // We revalidate before redirecting to ensure the list is updated
+        revalidatePath("/");
     } catch (error) {
         console.error("DELETE_ERROR:", error);
         return { error: "Failed to delete member data." };
     }
 
-    revalidatePath("/");
+    // ARCHITECTURE NOTE: redirect() must be called outside of try/catch
     redirect("/");
 }
 
@@ -180,6 +200,7 @@ export async function updateRevenueGoal(newGoal: number) {
             update: { revenueGoal: newGoal },
             create: { id: "settings", revenueGoal: newGoal },
         });
+
         revalidatePath("/");
         return { success: true };
     } catch (error) {

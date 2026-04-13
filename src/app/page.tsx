@@ -11,7 +11,9 @@ import { GoalTracker } from "@/features/members/components/GoalTracker";
 import { ExportReportButton } from "@/features/analytics/components/ExportReportButton";
 import { QRScanner } from "@/features/members/components/QRScanner";
 import { TierDistributionChart } from "../features/members/components/TierDistributionChart";
-import { SignOutButton } from "@/features/auth/components/SignOutButton"; // NEW FEATURE
+import { SignOutButton } from "@/features/auth/components/SignOutButton";
+
+// ARCHITECTURE KINDNESS: Import the data engines
 import {
   getMembers,
   getGymStats,
@@ -21,6 +23,13 @@ import {
   getRevenueGoalProgress,
   getMembershipDistribution
 } from "@/features/members/queries";
+
+/**
+ * 🏛️ PRODUCTION DIRECTIVE
+ * Forces the page to be dynamic. Without this, Next.js caches the dashboard
+ * as a static HTML file, which is why your charts previously stayed at 0.
+ */
+export const dynamic = "force-dynamic";
 
 // ARCHITECTURE KINDNESS: Explicit types for serialized data from the server
 interface SerializedMember {
@@ -36,6 +45,7 @@ export default async function Home() {
   /**
    * DATA FOUNDATIONS:
    * Parallel fetching ensures the dashboard loads all BI streams simultaneously.
+   * This is much faster than fetching them one-by-one (Waterfall).
    */
   const [members, stats, trend, peakHours, churnRisk, goal, tiers] = await Promise.all([
     getMembers() as Promise<SerializedMember[]>,
@@ -73,13 +83,13 @@ export default async function Home() {
           </div>
         </div>
 
-        {/* BI & OPS CONTROLS: Enhanced with Sign Out feature */}
+        {/* BI & OPS CONTROLS: Enhanced with Sign Out and QR Scanner */}
         <div className="hidden md:flex flex-col items-end gap-3 text-right">
           <div className="flex items-center gap-2">
             <QRScanner />
             <ExportReportButton data={{ stats, tiers }} />
             <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800 mx-1" />
-            <SignOutButton /> {/* NEW FEATURE: Integrated into the action row */}
+            <SignOutButton />
           </div>
           <div>
             <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">
