@@ -16,27 +16,18 @@ export default function AdminLoginPage() {
                 {/* 1. BRANDING (Keep it here, remove from LoginForm) */}
                 <div className="flex flex-col items-center mb-12 text-center">
                     <div className="relative w-32 h-10 mb-8">
-                        <Image
-                            src="/next.svg"
-                            alt="Logo"
-                            fill
-                            className="invert opacity-70 object-contain"
-                            priority
-                        />
+                        
                     </div>
 
-                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/10 rounded-full border border-blue-500/20 mb-6">
-                        <ShieldCheck className="w-3.5 h-3.5 text-blue-500" />
-                        <span className="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em]">
-                            Secure Gateway
-                        </span>
+                    <div className="inline-flex items-center gap-2 px-3 py-1">
+                       
                     </div>
 
                     <h1 className="text-4xl font-black text-white uppercase italic tracking-tighter leading-none mb-3">
                         SYSTEM ACCESS
                     </h1>
                     <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-[0.3em] opacity-60 italic">
-                        TUP Manila BI System v2.0
+                        Log-in to access Dashboard
                     </p>
                 </div>
 
@@ -57,7 +48,7 @@ export default function AdminLoginPage() {
 
                         <div className="flex flex-col items-center gap-1 opacity-30">
                             <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-[0.4em]">
-                                TUP Manila • Admin Portal
+                                • Admin Portal •
                             </span>
                         </div>
                     </div>

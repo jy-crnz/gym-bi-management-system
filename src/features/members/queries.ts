@@ -2,55 +2,123 @@ import { prisma } from "@/lib/prisma";
 
 /**
  * ---------------------------------------------------------------------------
+ * ARCHITECTURE KINDNESS: The Time Engine
+ * ---------------------------------------------------------------------------
+ * Translates URL string ranges into secure Date objects for Prisma.
+ * This ensures all BI charts sync to the same exact time window.
+ */
+function getDateFromRange(range: string): Date | undefined {
+    if (range === "all") return undefined; // undefined tells Prisma not to filter by date
+
+    const date = new Date();
+    switch (range) {
+        case "7d":
+            date.setDate(date.getDate() - 7);
+            break;
+        case "30d":
+            date.setDate(date.getDate() - 30);
+            break;
+        case "90d":
+            date.setDate(date.getDate() - 90);
+            break;
+        default:
+            date.setDate(date.getDate() - 30); // Default fallback
+    }
+    return date;
+}
+
+/**
+ * ---------------------------------------------------------------------------
  * SECTION 1: DASHBOARD DIRECTORY
  * ---------------------------------------------------------------------------
  */
 
 /**
- * BI GOAL: Retrieve all members for the management dashboard.
- * Snappy Load: We take 10 to keep the initial dashboard load fast.
+ * BI GOAL: Paginated, Filtered, and Searchable Member Directory.
  */
-export async function getMembers() {
-    try {
-        const members = await prisma.member.findMany({
-            orderBy: { createdAt: "desc" },
-            take: 10,
-        });
+export async function getMembers({
+    range = "30d",
+    page = 1,
+    query = "",
+    status,
+    tier
+}: {
+    range?: string;
+    page?: number;
+    query?: string;
+    status?: string;
+    tier?: string;
+}) {
+    // 1. Time Engine Filter
+    const startDate = getDateFromRange(range);
 
-        // Sanitizing: Flattens Prisma objects (Dates/Decimals) into POJOs for Next.js
-        return JSON.parse(JSON.stringify(members));
+    // 2. Build the exact "Where" clause dynamically
+    const where: any = {};
+    if (startDate) where.createdAt = { gte: startDate };
+    if (status && status !== "ALL") where.status = status;
+    if (tier && tier !== "ALL") where.tier = tier;
+    if (query) {
+        where.OR = [
+            { name: { contains: query, mode: "insensitive" } },
+            { email: { contains: query, mode: "insensitive" } },
+        ];
+    }
+
+    // 3. Pagination Math
+    const limit = 5; // Show 5 members per page to fit nicely in the UI
+    const skip = (page - 1) * limit;
+
+    try {
+        // Run both queries simultaneously (Count total + Get actual data)
+        const [members, totalCount] = await Promise.all([
+            prisma.member.findMany({
+                where,
+                orderBy: { createdAt: "desc" },
+                skip,
+                take: limit,
+            }),
+            prisma.member.count({ where })
+        ]);
+
+        return {
+            data: JSON.parse(JSON.stringify(members)),
+            metadata: {
+                total: totalCount,
+                totalPages: Math.ceil(totalCount / limit),
+                currentPage: page
+            }
+        };
     } catch (error) {
         console.error("QUERY_ERROR (getMembers):", error);
-        return [];
+        return { data: [], metadata: { total: 0, totalPages: 1, currentPage: 1 } };
     }
 }
 
 /**
  * ---------------------------------------------------------------------------
- * SECTION 2: EXECUTIVE KPIS
+ * SECTION 2: EXECUTIVE KPIS & FINANCIALS
  * ---------------------------------------------------------------------------
  */
 
-/**
- * BI GOAL: Aggregate metrics for the Executive Dashboard.
- */
-export async function getGymStats() {
-    try {
-        // Use individual awaits or handle errors specifically for the 'Today' query
-        // which is the most likely to fail due to Date objects
-        const totalMembers = await prisma.member.count().catch(() => 0);
-        const activeMembers = await prisma.member.count({ where: { status: "ACTIVE" } }).catch(() => 0);
+export async function getGymStats(range: string = "30d") {
+    const startDate = getDateFromRange(range);
+    const dateFilter = startDate ? { createdAt: { gte: startDate } } : {};
 
-        // Timezone-safe "Today" check using date-fns (already in your package.json)
+    try {
+        const totalMembers = await prisma.member.count({ where: dateFilter }).catch(() => 0);
+        const activeMembers = await prisma.member.count({
+            where: { ...dateFilter, status: "ACTIVE" }
+        }).catch(() => 0);
+
         const todayStart = new Date();
         todayStart.setHours(0, 0, 0, 0);
-
         const todayAttendance = await prisma.attendance.count({
             where: { checkIn: { gte: todayStart } },
         }).catch(() => 0);
 
         const revenueData = await prisma.transaction.aggregate({
-            _sum: { amount: true }
+            _sum: { amount: true },
+            where: dateFilter
         }).catch(() => ({ _sum: { amount: 0 } }));
 
         return {
@@ -65,17 +133,14 @@ export async function getGymStats() {
     }
 }
 
-/**
- * BI GOAL: Performance vs. Target.
- */
-export async function getRevenueGoalProgress() {
+export async function getRevenueGoalProgress(range: string = "30d") {
     try {
         const settings = await prisma.systemSettings.findUnique({
             where: { id: "settings" }
         });
         const target = Number(settings?.revenueGoal || 50000);
 
-        const stats = await getGymStats();
+        const stats = await getGymStats(range);
         const currentRevenue = stats.totalRevenue;
         const percentage = (currentRevenue / target) * 100;
 
@@ -91,23 +156,48 @@ export async function getRevenueGoalProgress() {
     }
 }
 
+export async function getFinancialHealth(range: string = "30d") {
+    const startDate = getDateFromRange(range);
+    const dateFilter = startDate ? { createdAt: { gte: startDate } } : {};
+
+    try {
+        const activeMembersCount = await prisma.member.count({
+            where: { ...dateFilter, status: "ACTIVE" }
+        });
+
+        const revenueData = await prisma.transaction.aggregate({
+            _sum: { amount: true },
+            where: dateFilter
+        });
+        const totalRevenue = Number(revenueData._sum?.amount || 0);
+
+        const arpu = activeMembersCount > 0 ? (totalRevenue / activeMembersCount) : 0;
+        const estimatedLifespanMonths = 8;
+        const cltv = arpu * estimatedLifespanMonths;
+
+        return {
+            arpu: Math.round(arpu),
+            cltv: Math.round(cltv)
+        };
+    } catch (error) {
+        console.error("FINANCIAL_HEALTH_ERROR:", error);
+        return { arpu: 0, cltv: 0 };
+    }
+}
+
 /**
  * ---------------------------------------------------------------------------
  * SECTION 3: TREND & BEHAVIOR ANALYTICS
  * ---------------------------------------------------------------------------
  */
 
-/**
- * BI GOAL: Generate Time-Series data for revenue trends.
- */
-export async function getRevenueTrend() {
+export async function getRevenueTrend(range: string = "30d") {
+    const startDate = getDateFromRange(range);
+    const dateFilter = startDate ? { createdAt: { gte: startDate } } : {};
+
     try {
         const transactions = await prisma.transaction.findMany({
-            where: {
-                createdAt: {
-                    gte: new Date(new Date().setDate(new Date().getDate() - 7)),
-                },
-            },
+            where: dateFilter,
             orderBy: { createdAt: 'asc' },
         });
 
@@ -128,16 +218,13 @@ export async function getRevenueTrend() {
     }
 }
 
-/**
- * BI GOAL: Identify gym utilization patterns (Peak Hours).
- */
-export async function getPeakHoursData() {
-    try {
-        const todayStart = new Date();
-        todayStart.setHours(0, 0, 0, 0);
+export async function getPeakHoursData(range: string = "30d") {
+    const startDate = getDateFromRange(range);
+    const safeStartDate = startDate || new Date(new Date().setDate(new Date().getDate() - 30));
 
+    try {
         const attendances = await prisma.attendance.findMany({
-            where: { checkIn: { gte: todayStart } },
+            where: { checkIn: { gte: safeStartDate } },
             select: { checkIn: true },
         });
 
@@ -164,17 +251,80 @@ export async function getPeakHoursData() {
 }
 
 /**
+ * 🏛️ NEW BI GOAL: Cohort Retention Engine
+ * Calculates what percentage of members return 1 month, 2 months, and 3 months after joining.
+ */
+export async function getCohortRetention() {
+    try {
+        // Fetch members who joined in the last 6 months to keep the matrix focused
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
+        sixMonthsAgo.setDate(1);
+
+        const members = await prisma.member.findMany({
+            where: { createdAt: { gte: sixMonthsAgo } },
+            select: {
+                createdAt: true,
+                attendance: { select: { checkIn: true } }
+            }
+        });
+
+        // Group by Cohort (Month Joined)
+        const cohorts: Record<string, { total: number, m1: number, m2: number, m3: number }> = {};
+
+        members.forEach(member => {
+            const joinDate = new Date(member.createdAt);
+            const cohortKey = joinDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+
+            if (!cohorts[cohortKey]) {
+                cohorts[cohortKey] = { total: 0, m1: 0, m2: 0, m3: 0 };
+            }
+
+            cohorts[cohortKey].total += 1;
+
+            // Check if they attended in 30-day windows after joining
+            const hasAttendanceInWindow = (startDays: number, endDays: number) => {
+                return member.attendance.some(a => {
+                    const diffTime = new Date(a.checkIn).getTime() - joinDate.getTime();
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    return diffDays > startDays && diffDays <= endDays;
+                });
+            };
+
+            if (hasAttendanceInWindow(1, 30)) cohorts[cohortKey].m1 += 1;
+            if (hasAttendanceInWindow(31, 60)) cohorts[cohortKey].m2 += 1;
+            if (hasAttendanceInWindow(61, 90)) cohorts[cohortKey].m3 += 1;
+        });
+
+        // Format as percentages for the UI
+        return Object.entries(cohorts).map(([cohort, data]) => ({
+            cohort,
+            total: data.total,
+            m1: data.total > 0 ? Math.round((data.m1 / data.total) * 100) : 0,
+            m2: data.total > 0 ? Math.round((data.m2 / data.total) * 100) : 0,
+            m3: data.total > 0 ? Math.round((data.m3 / data.total) * 100) : 0,
+        }));
+    } catch (error) {
+        console.error("COHORT_ERROR:", error);
+        return [];
+    }
+}
+
+/**
  * ---------------------------------------------------------------------------
  * SECTION 4: SEGMENTATION & CHURN
  * ---------------------------------------------------------------------------
  */
 
-/**
- * BI GOAL: Membership Tier Distribution (Segment Analysis).
- */
-export async function getMembershipDistribution() {
+export async function getMembershipDistribution(range: string = "30d") {
+    const startDate = getDateFromRange(range);
+    const dateFilter = startDate ? { createdAt: { gte: startDate } } : {};
+
     try {
-        const members = await prisma.member.findMany({ select: { tier: true } });
+        const members = await prisma.member.findMany({
+            where: dateFilter,
+            select: { tier: true }
+        });
 
         const distribution = members.reduce((acc: Record<string, number>, member) => {
             acc[member.tier] = (acc[member.tier] || 0) + 1;
@@ -194,10 +344,7 @@ export async function getMembershipDistribution() {
     }
 }
 
-/**
- * BI GOAL: Identify At-Risk Members (Churn Analytics).
- */
-export async function getChurnRiskMembers() {
+export async function getChurnRiskMembers(range?: string) {
     try {
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -227,26 +374,18 @@ export async function getChurnRiskMembers() {
  * ---------------------------------------------------------------------------
  */
 
-/**
- * NEW FEATURE SUPPORT: Helper for Member Login Handshake.
- */
 export async function getMemberByEmail(email: string) {
     try {
-        const member = await prisma.member.findUnique({
+        return await prisma.member.findUnique({
             where: { email },
             select: { id: true }
         });
-        return member;
     } catch (error) {
         console.error("GET_BY_EMAIL_ERROR:", error);
         return null;
     }
 }
 
-/**
- * BI GOAL: Individual Member Analytics & Portal Pass Data.
- * Includes attendance for the AttendanceCalendar and history for the Pass UI.
- */
 export async function getMemberById(id: string) {
     try {
         const member = await prisma.member.findUnique({
@@ -257,7 +396,6 @@ export async function getMemberById(id: string) {
             },
         });
 
-        // Safety check to avoid serialization errors
         if (!member) return null;
 
         return JSON.parse(JSON.stringify(member));
