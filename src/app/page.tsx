@@ -12,11 +12,11 @@ import { QRScanner } from "@/features/members/components/QRScanner";
 import { TierDistributionChart } from "../features/members/components/TierDistributionChart";
 import { SignOutButton } from "@/features/auth/components/SignOutButton";
 
-// 🏛️ Analytics Components
+// 🏛️ Analytics & Navigation Components
 import { DateFilter } from "@/features/analytics/components/DateFilter";
 import { FinancialHealth } from "@/features/analytics/components/FinancialHealth";
 import { CohortMatrix } from "@/features/analytics/components/CohortMatrix";
-import { DirectoryControls } from "@/features/members/components/DirectoryControls"; // ⬅️ NEW FEATURE
+import { DirectoryControls } from "@/features/members/components/DirectoryControls";
 
 import {
   getMembers,
@@ -128,28 +128,43 @@ function MemberAvatar({ name }: { name: string }) {
 export default async function Home(props: {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  // 1. Unwrap the Promise safely
+  // 1. Unwrap searchParams to read URL state
   const searchParams = await props.searchParams;
 
-  // 2. Extract ALL parameters from the URL
+  // 2. Extract ALL parameters (BI Range + Directory Filters)
   const range = (searchParams?.range as string) || "30d";
   const query = (searchParams?.q as string) || "";
   const status = (searchParams?.status as string) || undefined;
   const tier = (searchParams?.tier as string) || undefined;
   const page = Number(searchParams?.page) || 1;
 
-  // 3. Fetch the data streams
-  const stats = await getGymStats(range);
-  const financials = await getFinancialHealth(range);
-  const trend = await getRevenueTrend(range);
-  const peakHours = await getPeakHoursData(range);
-  const churnRisk = await getChurnRiskMembers(range);
-  const goal = await getRevenueGoalProgress(range);
-  const tiers = await getMembershipDistribution(range);
-  const cohortData = await getCohortRetention();
+  /**
+   * 🏛️ ARCHITECTURE KINDNESS: Parallel Execution
+   * Fire all queries simultaneously to eliminate the "Waterfall" lag.
+   */
+  const [
+    stats,
+    financials,
+    trend,
+    peakHours,
+    churnRisk,
+    goal,
+    tiers,
+    cohortData,
+    membersResult
+  ] = await Promise.all([
+    getGymStats(range),
+    getFinancialHealth(range),
+    getRevenueTrend(range),
+    getPeakHoursData(range),
+    getChurnRiskMembers(range),
+    getRevenueGoalProgress(range),
+    getMembershipDistribution(range),
+    getCohortRetention(),
+    getMembers({ range, page, query, status, tier })
+  ]);
 
-  // 🏛️ NEW: Fetch Paginated & Filtered Members
-  const membersResult = await getMembers({ range, page, query, status, tier });
+  // 3. Extract paginated results
   const members = membersResult.data as SerializedMember[];
   const metadata = membersResult.metadata;
 
@@ -189,7 +204,7 @@ export default async function Home(props: {
       {/* ── MAIN ────────────────────────────────────────────────────────── */}
       <main className="flex-1 w-full max-w-6xl mx-auto px-6 py-10">
 
-        {/* --- PAGE INTRO & FILTERS --- */}
+        {/* --- COMMAND CENTER HEADER & FILTERS --- */}
         <div className="mb-10 flex flex-col sm:flex-row sm:items-end justify-between gap-6">
           <div>
             <h1 className="text-3xl font-black text-white tracking-tight">
@@ -202,9 +217,7 @@ export default async function Home(props: {
           <DateFilter />
         </div>
 
-        {/* =========================================================================
-            ZONE 1: EXECUTIVE PULSE (High-level metrics)
-        ========================================================================= */}
+        {/* ZONE 1: EXECUTIVE PULSE (High-level metrics) */}
         <SectionDivider label="Executive Pulse" />
         <StatsGrid
           total={stats.totalMembers}
@@ -214,9 +227,7 @@ export default async function Home(props: {
         />
         <FinancialHealth arpu={financials.arpu} cltv={financials.cltv} />
 
-        {/* =========================================================================
-            ZONE 2: OPERATIONS DESK (Daily tasks: Register & Check-in)
-        ========================================================================= */}
+        {/* ZONE 2: OPERATIONS DESK (Daily tasks: Register & Directory) */}
         <SectionDivider label="Operations Desk" />
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
 
@@ -234,20 +245,19 @@ export default async function Home(props: {
             <RegistrationForm />
           </div>
 
-          {/* Right: Member Directory (2/3 width) */}
+          {/* Right: Paginated Member Directory (2/3 width) */}
           <div className="xl:col-span-8 rounded-2xl border border-zinc-800 bg-zinc-900/50 overflow-hidden">
-
             <div className="px-6 py-4 flex items-center justify-between bg-zinc-900">
               <div>
                 <h3 className="text-sm font-bold text-zinc-100">Live Directory</h3>
-                <p className="text-[10px] text-zinc-500 mt-0.5">Manage and check-in active members</p>
+                <p className="text-[10px] text-zinc-500 mt-0.5">Search and manage active members</p>
               </div>
               <span className="text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1.5 rounded-full">
                 {metadata.total} Total Matches
               </span>
             </div>
 
-            {/* 🏛️ NEW: Search, Filter, and Pagination Controls */}
+            {/* 🏛️ Search, Filter, and Pagination UI */}
             <DirectoryControls totalPages={metadata.totalPages} currentPage={metadata.currentPage} />
 
             <div className="overflow-x-auto">
@@ -301,28 +311,21 @@ export default async function Home(props: {
           </div>
         </div>
 
-        {/* =========================================================================
-            ZONE 3: BUSINESS INTELLIGENCE (Charts & Deep Analytics)
-        ========================================================================= */}
+        {/* ZONE 3: BUSINESS INTELLIGENCE (Charts & Trends) */}
         <SectionDivider label="Business Intelligence" />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-          {/* Left: Financial Trends */}
           <div className="space-y-8">
             <GoalTracker current={goal.current} target={goal.target} percentage={goal.percentage} />
             <RevenueChart data={trend} />
             <TierDistributionChart data={tiers} />
           </div>
-
-          {/* Right: Utilization & Risk */}
           <div className="space-y-8">
             <PeakHoursChart data={peakHours} />
             <ChurnRiskList members={churnRisk} />
           </div>
         </div>
 
-        {/* =========================================================================
-            ZONE 4: RETENTION MACHINE LEARNING (The Showstopper)
-        ========================================================================= */}
+        {/* ZONE 4: RETENTION MACHINE LEARNING (The Showstopper) */}
         <SectionDivider label="Long-term Retention Analytics" />
         <CohortMatrix data={cohortData} />
 
@@ -341,8 +344,8 @@ export default async function Home(props: {
             </div>
           </div>
           <div className="text-center sm:text-right">
-            <p className="text-xs text-zinc-400 font-medium">TUP Manila · BSIT-3A · <span className="text-zinc-300 font-bold">Fly High Coders</span></p>
-            <p className="text-[10px] text-zinc-600 uppercase tracking-widest mt-1">Capstone v1.0.0</p>
+            <p className="text-xs text-zinc-400 font-medium">BSIT-3A · <span className="text-zinc-300 font-bold">Fly High Coders</span></p>
+            <p className="text-[10px] text-zinc-600 uppercase tracking-widest mt-1">Version 1.0.0</p>
           </div>
         </div>
       </footer>
