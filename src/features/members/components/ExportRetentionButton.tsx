@@ -42,7 +42,7 @@ export function ExportRetentionButton({ data }: { data: AtRiskMember[] }) {
     return (
         <button
             onClick={handleExport}
-            className="flex items-center gap-2 bg-black dark:bg-zinc-100 text-white dark:text-black px-4 py-2 rounded-lg text-sm font-bold hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-black px-4 py-2 rounded-lg text-sm font-bold hover:opacity-80 transition-opacity"
         >
             <Download className="w-4 h-4" />
             Export CSV

@@ -10,29 +10,30 @@ interface GoalProps {
 
 export function GoalTracker({ current, target, percentage }: GoalProps) {
     return (
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm transition-all hover:border-zinc-300 dark:hover:border-zinc-700">
+        /* 🏛️ FIX: Locked container to bg-zinc-900 and standardized hover border */
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm transition-all hover:border-zinc-700">
             <div className="flex justify-between items-end mb-4">
                 <div>
-                    <h3 className="font-bold text-slate-800 dark:text-zinc-200">Monthly Revenue Goal</h3>
+                    {/* 🏛️ FIX: Locked title to zinc-200 */}
+                    <h3 className="font-bold text-zinc-200">Monthly Revenue Goal</h3>
                     <div className="flex items-center gap-2">
                         <p className="text-xs text-zinc-500 uppercase tracking-widest font-medium">
                             Target: ₱{target.toLocaleString()}
                         </p>
-                        {/* KINDNESS TIP: Inline editing allows the owner to pivot 
-                          the strategy without leaving the dashboard view.
-                        */}
                         <EditGoalButton currentGoal={target} />
                     </div>
                 </div>
                 <div className="text-right">
-                    <span className="text-2xl font-black text-black dark:text-white">
+                    {/* 🏛️ FIX: Locked percentage text to white */}
+                    <span className="text-2xl font-black text-white">
                         {percentage.toFixed(0)}%
                     </span>
                 </div>
             </div>
 
             {/* PROGRESS BAR CONTAINER */}
-            <div className="w-full h-4 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden border border-zinc-200 dark:border-zinc-700">
+            {/* 🏛️ FIX: Locked track background to zinc-800 and border to zinc-700 */}
+            <div className="w-full h-4 bg-zinc-800 rounded-full overflow-hidden border border-zinc-700">
                 <div
                     className="h-full bg-emerald-500 transition-all duration-1000 ease-out"
                     style={{ width: `${percentage}%` }}
@@ -40,12 +41,15 @@ export function GoalTracker({ current, target, percentage }: GoalProps) {
             </div>
 
             <div className="mt-4 flex justify-between items-center">
-                <p className="text-sm text-zinc-600 dark:text-zinc-400 font-medium">
+                {/* 🏛️ FIX: Locked description text to zinc-400 */}
+                <p className="text-sm text-zinc-400 font-medium">
                     ₱{current.toLocaleString()} collected of ₱{target.toLocaleString()} monthly target.
                 </p>
+
                 {/* Visual indicator for Goal Reached */}
                 {percentage >= 100 && (
-                    <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded uppercase tracking-tighter animate-pulse">
+                    /* 🏛️ FIX: Locked badge to emerald-900/20 background */
+                    <span className="text-[10px] font-black text-emerald-400 bg-emerald-900/20 px-2 py-0.5 rounded uppercase tracking-tighter animate-pulse">
                         Goal Met
                     </span>
                 )}

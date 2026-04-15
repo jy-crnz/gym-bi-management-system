@@ -1,26 +1,29 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { createPortal } from "react-dom"; // 🏛️ ADDED: React Portal
+import { createPortal } from "react-dom";
 import { Html5Qrcode } from "html5-qrcode";
 import { logAttendance } from "../actions";
-import { Camera, X, CheckCircle2, ScanLine, Laptop, Lock, Scan, CameraOff, ImageUp, ChevronDown } from "lucide-react";
+// 🏛️ Added User icon for the identity card UI
+import { Camera, X, CheckCircle2, ScanLine, Laptop, Lock, Scan, CameraOff, ImageUp, ChevronDown, User } from "lucide-react";
 
 type ScanState = "idle" | "starting" | "scanning" | "success" | "error";
 
 export function QRScanner() {
-    const [mounted, setMounted] = useState(false); // 🏛️ ADDED: Hydration check
+    const [mounted, setMounted] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const [scanState, setScanState] = useState<ScanState>("idle");
     const [cameras, setCameras] = useState<{ id: string; label: string }[]>([]);
     const [selectedCamera, setSelectedCamera] = useState<string>("");
     const [imageError, setImageError] = useState<string | null>(null);
 
+    // 🏛️ NEW FEATURE: Store the identity of the person just scanned
+    const [scannedMember, setScannedMember] = useState<{ name: string } | null>(null);
+
     const scannerRef = useRef<Html5Qrcode | null>(null);
     const isRunningRef = useRef(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // 🏛️ Ensure portal only runs on the client to prevent hydration errors
     useEffect(() => {
         setMounted(true);
     }, []);
@@ -60,11 +63,24 @@ export function QRScanner() {
                 { fps: 15, qrbox: { width: 200, height: 200 }, aspectRatio: 1.0 },
                 async (decodedText) => {
                     if (cancelled) return;
-                    setScanState("success");
+
+                    // Stop scanning immediately on detection
                     isRunningRef.current = false;
                     await scannerRef.current?.stop().catch(() => { });
-                    try { await logAttendance(decodedText); } catch { }
-                    setTimeout(() => handleClose(), 2500);
+
+                    try {
+                        // 🏛️ CAPTURE IDENTITY: Log attendance and get the name back
+                        const result = await logAttendance(decodedText);
+                        if (result?.name) {
+                            setScannedMember({ name: result.name });
+                        }
+                        setScanState("success");
+                    } catch {
+                        setScanState("error");
+                    }
+
+                    // 🏛️ INCREASED TIMEOUT: Give staff 3.5s to read the member's name
+                    setTimeout(() => handleClose(), 3500);
                 },
                 () => { }
             )
@@ -89,6 +105,7 @@ export function QRScanner() {
         setCameras([]);
         setSelectedCamera("");
         setImageError(null);
+        setScannedMember(null); // 🏛️ Reset identity on close
     };
 
     const handleCameraChange = async (newId: string) => {
@@ -104,10 +121,16 @@ export function QRScanner() {
         const fileScanner = new Html5Qrcode("qr-file-scanner", { verbose: false });
         try {
             const result = await fileScanner.scanFile(file, false);
-            setScanState("success");
             await safeStop();
-            try { await logAttendance(result); } catch { }
-            setTimeout(() => handleClose(), 2500);
+
+            // 🏛️ FILE UPLOAD IDENTITY: Also retrieve name for file scans
+            const attendanceResult = await logAttendance(result);
+            if (attendanceResult?.name) {
+                setScannedMember({ name: attendanceResult.name });
+            }
+
+            setScanState("success");
+            setTimeout(() => handleClose(), 3500);
         } catch {
             setImageError("No QR code found in this image.");
         } finally {
@@ -116,7 +139,6 @@ export function QRScanner() {
         }
     };
 
-    // 🏛️ MODAL CONTENT: Extracted to a variable so we can portal it cleanly
     const modalContent = isOpen ? (
         <div className="fixed inset-0 z-100 flex items-center justify-center bg-zinc-950/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
             <div className="bg-zinc-900 w-full max-w-sm rounded-2xl shadow-2xl border border-zinc-800 relative">
@@ -130,7 +152,7 @@ export function QRScanner() {
                                 <span className="text-[10px] font-semibold text-blue-400 uppercase tracking-widest">Live scanner</span>
                             </div>
                             <h3 className="text-base font-semibold text-white tracking-tight">Fast-pass check-in</h3>
-                            <p className="text-xs text-zinc-400 mt-0.5">Point camera at a member's QR pass</p>
+                            <p className="text-xs text-zinc-400 mt-0.5">Point camera at a member&apos;s QR pass</p>
                         </div>
                         <button
                             onClick={handleClose}
@@ -144,6 +166,7 @@ export function QRScanner() {
                     <div className="relative rounded-xl overflow-hidden bg-black aspect-square w-full">
                         <div id="qr-viewport" className="absolute inset-0 w-full h-full" />
 
+                        {/* Starting/Idle States */}
                         {(scanState === "idle" || scanState === "starting") && (
                             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 z-10 pointer-events-none">
                                 <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center">
@@ -155,6 +178,7 @@ export function QRScanner() {
                             </div>
                         )}
 
+                        {/* Error State */}
                         {scanState === "error" && (
                             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 z-10 pointer-events-none">
                                 <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center">
@@ -164,18 +188,28 @@ export function QRScanner() {
                             </div>
                         )}
 
+                        {/* 🏛️ IMPROVED SUCCESS UI: Show scanned identity */}
                         {scanState === "success" && (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-zinc-950/90 z-30 animate-in zoom-in-75 duration-300">
-                                <div className="w-16 h-16 rounded-full bg-emerald-500/15 border-2 border-emerald-400 flex items-center justify-center">
-                                    <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-zinc-950/95 z-30 animate-in zoom-in-95 duration-300">
+                                <div className="relative">
+                                    <div className="w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/50 flex items-center justify-center">
+                                        <User className="w-10 h-10 text-emerald-400" />
+                                    </div>
+                                    <div className="absolute -bottom-1 -right-1 bg-emerald-500 rounded-full p-1 border-4 border-zinc-950">
+                                        <CheckCircle2 className="w-4 h-4 text-zinc-950" />
+                                    </div>
                                 </div>
-                                <div className="text-center">
-                                    <p className="text-sm font-semibold text-emerald-300">Verified</p>
-                                    <p className="text-xs text-emerald-600 mt-0.5">Member checked in</p>
+                                <div className="text-center px-6">
+                                    <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Access Granted</p>
+                                    <h2 className="text-xl font-black text-white uppercase italic tracking-tight truncate max-w-full">
+                                        {scannedMember?.name || "Member Verified"}
+                                    </h2>
+                                    <p className="text-xs text-zinc-500 mt-2 font-medium">Automatic check-in recorded.</p>
                                 </div>
                             </div>
                         )}
 
+                        {/* Scanning HUD */}
                         {scanState === "scanning" && (
                             <div className="absolute inset-0 pointer-events-none z-20">
                                 <div className="absolute top-4 left-4 w-6 h-6 border-t-2 border-l-2 border-blue-400" />
@@ -187,7 +221,7 @@ export function QRScanner() {
                         )}
                     </div>
 
-                    {/* Controls */}
+                    {/* Camera Selectors */}
                     <div className="flex items-center gap-2">
                         <button
                             onClick={() => fileInputRef.current?.click()}
@@ -224,14 +258,14 @@ export function QRScanner() {
                     <div id="qr-file-scanner" className="hidden" />
                     <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
 
-                    {/* Footer */}
+                    {/* Footer System Status */}
                     <div className="flex items-center justify-center gap-3 pt-3 border-t border-zinc-800">
-                        <div className="flex items-center gap-1.5 text-zinc-400">
+                        <div className="flex items-center gap-1.5 text-zinc-500">
                             <Laptop className="w-3 h-3" />
-                            <span className="text-[10px] font-medium uppercase tracking-widest">Device authorized</span>
+                            <span className="text-[10px] font-medium uppercase tracking-widest">Device Authorized</span>
                         </div>
-                        <div className="w-1 h-1 rounded-full bg-zinc-700" />
-                        <div className="flex items-center gap-1.5 text-zinc-400">
+                        <div className="w-1 h-1 rounded-full bg-zinc-800" />
+                        <div className="flex items-center gap-1.5 text-zinc-500">
                             <Lock className="w-3 h-3" />
                             <span className="text-[10px] font-medium uppercase tracking-widest">Encrypted</span>
                         </div>
@@ -253,7 +287,6 @@ export function QRScanner() {
                 #qr-viewport__dashboard { display: none !important; }
                 #qr-viewport canvas { opacity: 0 !important; pointer-events: none !important; }
                 #qr-viewport img { display: none !important; }
-                #qr-viewport > div > img { display: none !important; }
 
                 @keyframes scan-move {
                     0%, 100% { top: 1rem; }
@@ -274,7 +307,7 @@ export function QRScanner() {
                 Scan pass
             </button>
 
-            {/* 🏛️ TELEPORT THE MODAL: Bypasses the Header's CSS completely */}
+            {/* 🏛️ TELEPORT THE MODAL: Bypasses parent CSS constraints */}
             {mounted && isOpen && createPortal(modalContent, document.body)}
         </div>
     );

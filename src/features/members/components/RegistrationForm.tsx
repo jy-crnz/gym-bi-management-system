@@ -50,8 +50,11 @@ export function RegistrationForm() {
     };
 
     return (
-        <div className="max-w-md w-full bg-white dark:bg-zinc-900 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm transition-all hover:shadow-md">
-            <h2 className="text-xl font-bold mb-1 text-slate-800 dark:text-zinc-100">
+        /* 🏛️ FIX: Locked main container to bg-zinc-900 */
+        <div className="max-w-md w-full bg-zinc-900 p-6 rounded-xl border border-zinc-800 shadow-sm transition-all hover:shadow-md">
+
+            {/* 🏛️ FIX: Locked text to zinc-100 */}
+            <h2 className="text-xl font-bold mb-1 text-zinc-100">
                 New Member Registration
             </h2>
             <p className="text-[11px] text-zinc-500 uppercase tracking-widest font-medium mb-6">
@@ -66,7 +69,8 @@ export function RegistrationForm() {
                     </label>
                     <input
                         {...register("name")}
-                        className="w-full px-4 py-3 border border-zinc-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:bg-zinc-800 dark:border-zinc-700 dark:text-white text-sm"
+                        /* 🏛️ FIX: Locked inputs to bg-zinc-800 / border-zinc-700 */
+                        className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all text-white text-sm"
                         placeholder="Juan Dela Cruz"
                         disabled={isSubmitting}
                     />
@@ -83,7 +87,8 @@ export function RegistrationForm() {
                     <input
                         {...register("email")}
                         type="email"
-                        className="w-full px-4 py-3 border border-zinc-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:bg-zinc-800 dark:border-zinc-700 dark:text-white text-sm"
+                        /* 🏛️ FIX: Locked inputs to bg-zinc-800 / border-zinc-700 */
+                        className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all text-white text-sm"
                         placeholder="juan@example.com"
                         disabled={isSubmitting}
                     />
@@ -99,7 +104,8 @@ export function RegistrationForm() {
                     </label>
                     <select
                         {...register("tier")}
-                        className="w-full px-4 py-3 border border-zinc-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:bg-zinc-800 dark:border-zinc-700 dark:text-white text-sm appearance-none cursor-pointer"
+                        /* 🏛️ FIX: Locked inputs to bg-zinc-800 / border-zinc-700 */
+                        className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all text-white text-sm appearance-none cursor-pointer"
                         disabled={isSubmitting}
                     >
                         <option value="BASIC">Basic (₱1,000/mo)</option>
@@ -116,12 +122,14 @@ export function RegistrationForm() {
 
                 {/* Feedback Messages */}
                 {serverError && (
-                    <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-lg text-[11px] font-bold uppercase border border-red-100 dark:border-red-900/30">
+                    /* 🏛️ FIX: Locked error state to red-900/20 */
+                    <div className="p-3 bg-red-900/20 text-red-400 rounded-lg text-[11px] font-bold uppercase border border-red-900/30">
                         {serverError}
                     </div>
                 )}
                 {isSuccess && (
-                    <div className="p-3 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-lg text-[11px] font-bold uppercase border border-green-100 dark:border-green-900/30">
+                    /* 🏛️ FIX: Locked success state to green-900/20 */
+                    <div className="p-3 bg-green-900/20 text-green-400 rounded-lg text-[11px] font-bold uppercase border border-green-900/30">
                         Member registered successfully!
                     </div>
                 )}
@@ -130,7 +138,8 @@ export function RegistrationForm() {
                 <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full bg-slate-900 dark:bg-zinc-100 dark:text-slate-900 text-white py-3 rounded-lg font-black text-xs uppercase tracking-widest hover:bg-slate-800 dark:hover:bg-zinc-200 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-zinc-200 dark:shadow-none"
+                    /* 🏛️ FIX: Locked button to the stark white/zinc-100 high-contrast design */
+                    className="w-full bg-zinc-100 text-slate-900 py-3 rounded-lg font-black text-xs uppercase tracking-widest hover:bg-zinc-200 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     {isSubmitting ? "Processing..." : "Register Member"}
                 </button>

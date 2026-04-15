@@ -21,7 +21,6 @@ export function AttendanceCalendar({ attendance }: AttendanceCalendarProps) {
     const [currentMonth, setCurrentMonth] = useState(new Date());
 
     // 2. LOGIC: Calculate the grid boundaries
-    // We include start/end of week to ensure the calendar is a perfect grid (padding)
     const monthStart = startOfMonth(currentMonth);
     const monthEnd = endOfMonth(monthStart);
     const calendarStart = startOfWeek(monthStart);
@@ -38,7 +37,8 @@ export function AttendanceCalendar({ attendance }: AttendanceCalendarProps) {
     );
 
     return (
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm">
+        /* 🏛️ FIX: Stripped bg-white and dark: prefix. Locked to bg-zinc-900 */
+        <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-sm">
 
             {/* --- HEADER: MONTH NAVIGATION --- */}
             <div className="flex justify-between items-center mb-6">
@@ -46,20 +46,22 @@ export function AttendanceCalendar({ attendance }: AttendanceCalendarProps) {
                     <div className="p-2 bg-orange-500/10 rounded-lg">
                         <Flame className="w-4 h-4 text-orange-500" />
                     </div>
-                    <h3 className="font-black text-sm uppercase tracking-tighter text-slate-900 dark:text-white">
+                    {/* 🏛️ FIX: Locked text to white */}
+                    <h3 className="font-black text-sm uppercase tracking-tighter text-white">
                         {format(currentMonth, 'MMMM yyyy')}
                     </h3>
                 </div>
                 <div className="flex gap-1">
+                    {/* 🏛️ FIX: Locked hover state to bg-zinc-800 */}
                     <button
                         onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1))}
-                        className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full text-zinc-400 transition-all active:scale-90"
+                        className="p-1.5 hover:bg-zinc-800 rounded-full text-zinc-400 transition-all active:scale-90"
                     >
                         <ChevronLeft className="w-4 h-4" />
                     </button>
                     <button
                         onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1))}
-                        className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full text-zinc-400 transition-all active:scale-90"
+                        className="p-1.5 hover:bg-zinc-800 rounded-full text-zinc-400 transition-all active:scale-90"
                     >
                         <ChevronRight className="w-4 h-4" />
                     </button>
@@ -90,7 +92,8 @@ export function AttendanceCalendar({ attendance }: AttendanceCalendarProps) {
                                 ${!isCurrentMonth ? 'opacity-10 scale-90' : 'opacity-100'}
                                 ${hasVisited
                                     ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 z-10'
-                                    : 'bg-zinc-50 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600'
+                                    /* 🏛️ FIX: Locked inactive days to bg-zinc-800 text-zinc-500 */
+                                    : 'bg-zinc-800 text-zinc-500' 
                                 }
                                 ${isToday(day) && !hasVisited ? 'ring-1 ring-blue-500 text-blue-500' : ''}
                             `}

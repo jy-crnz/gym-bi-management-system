@@ -18,17 +18,16 @@ interface TrendData {
 
 /**
  * ARCHITECTURE KINDNESS: Custom Tooltip
- * Handles accessibility (A11y) by ensuring high contrast text
- * and dark mode compatibility.
+ * 🏛️ FIX: Locked to bg-zinc-800 permanently.
  */
 const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
         return (
-            <div className="bg-white dark:bg-zinc-800 p-3 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg">
-                <p className="text-xs font-bold text-slate-800 dark:text-zinc-100 mb-1">
+            <div className="bg-zinc-800 p-3 border border-zinc-700 rounded-lg shadow-lg">
+                <p className="text-xs font-bold text-zinc-100 mb-1">
                     {label}
                 </p>
-                <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">
+                <p className="text-sm font-black text-emerald-400">
                     ₱{payload[0].value.toLocaleString()}
                 </p>
             </div>
@@ -38,69 +37,60 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export function RevenueChart({ data }: { data: TrendData[] }) {
-    // HYDRATION GUARD: Prevents state updates before component mounts
     const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => {
-        /**
-         * FINAL BOSS FIX: Deferred Mounting
-         * Waiting 100ms ensures the Tailwind layout is 100% computed
-         * before Recharts tries to calculate its height/width.
-         */
         const timer = setTimeout(() => {
             setIsMounted(true);
         }, 100);
-
         return () => clearTimeout(timer);
     }, []);
 
-    // 1. SKELETON STATE: Prevents Layout Shift using canonical classes
+    // 1. SKELETON STATE: 🏛️ FIX: Stripped light mode colors.
     if (!isMounted) {
         return (
-            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm w-full h-75 animate-pulse flex items-center justify-center">
-                <div className="w-full h-32 bg-zinc-100 dark:bg-zinc-800 rounded-lg" />
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm w-full h-75 animate-pulse flex items-center justify-center">
+                <div className="w-full h-32 bg-zinc-800 rounded-lg" />
             </div>
         );
     }
 
     return (
-        /* CANONICAL FIX: Used h-75 and added min-h-0 for layout stability */
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm w-full h-75 min-h-0">
+        /* 🏛️ FIX: Locked card to bg-zinc-900 / border-zinc-800 */
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm w-full h-75 min-h-0">
             <div className="flex justify-between items-center mb-6">
-                <h3 className="font-bold text-slate-800 dark:text-zinc-200">7-Day Revenue Trend</h3>
-                <span className="text-[10px] text-zinc-400 font-medium uppercase tracking-widest">Financial Insights</span>
+                <h3 className="font-bold text-zinc-200">7-Day Revenue Trend</h3>
+                <span className="text-[10px] text-zinc-500 font-medium uppercase tracking-widest">Financial Insights</span>
             </div>
 
-            {/* TERMINAL WARNING FIX: h-55 wrapper provides fixed bounds. */}
             <div className="w-full h-55 min-h-0">
-                {/* FINAL SILENCE FIX: Conditional render + debounce */}
                 {isMounted ? (
-                    <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 } }>
+                    <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
                         <LineChart data={data}>
                             <CartesianGrid
                                 strokeDasharray="3 3"
                                 vertical={false}
-                                stroke="#e2e8f0"
-                                className="dark:stroke-zinc-800"
+                                /* 🏛️ FIX: Locked grid lines to zinc-800 */
+                                stroke="#27272a"
                             />
                             <XAxis
                                 dataKey="date"
                                 axisLine={false}
                                 tickLine={false}
-                                tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 500 }}
+                                tick={{ fill: '#71717a', fontSize: 10, fontWeight: 500 }}
                                 dy={10}
                             />
                             <YAxis
                                 axisLine={false}
                                 tickLine={false}
-                                tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 500 }}
+                                tick={{ fill: '#71717a', fontSize: 10, fontWeight: 500 }}
                                 tickFormatter={(value) => `₱${value}`}
                                 dx={-10}
                             />
 
                             <Tooltip
                                 content={<CustomTooltip />}
-                                cursor={{ stroke: '#94a3b8', strokeWidth: 1 }}
+                                cursor={{ stroke: '#3f3f46', strokeWidth: 1 }}
                             />
 
                             <Line
@@ -108,8 +98,9 @@ export function RevenueChart({ data }: { data: TrendData[] }) {
                                 dataKey="amount"
                                 stroke="#10b981"
                                 strokeWidth={3}
-                                dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }}
-                                activeDot={{ r: 6, strokeWidth: 0 }}
+                                /* 🏛️ FIX: Dot stroke changed from white to zinc-900 to blend with background */
+                                dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#18181b' }}
+                                activeDot={{ r: 6, strokeWidth: 0, fill: '#34d399' }}
                                 animationDuration={1500}
                             />
                         </LineChart>

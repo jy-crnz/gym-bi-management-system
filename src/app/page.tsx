@@ -18,6 +18,9 @@ import { FinancialHealth } from "@/features/analytics/components/FinancialHealth
 import { CohortMatrix } from "@/features/analytics/components/CohortMatrix";
 import { DirectoryControls } from "@/features/members/components/DirectoryControls";
 
+// 🏛️ Membership Lifecycle Component
+import { StatusEditor } from "@/features/members/components/StatusEditor";
+
 import {
   getMembers,
   getGymStats,
@@ -94,19 +97,6 @@ function TierBadge({ tier }: { tier: SerializedMember["tier"] }) {
   );
 }
 
-function StatusBadge({ status }: { status: SerializedMember["status"] }) {
-  const styles: Record<SerializedMember["status"], string> = {
-    ACTIVE: "bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20",
-    INACTIVE: "bg-zinc-700/60   text-zinc-500   ring-1 ring-zinc-600/40",
-    CANCELLED: "bg-red-500/10    text-red-400    ring-1 ring-red-500/20",
-  };
-  return (
-    <span className={`w-fit inline-flex text-[10px] font-bold uppercase tracking-tight px-2.5 py-0.5 rounded-full ${styles[status]}`}>
-      {status}
-    </span>
-  );
-}
-
 function MemberAvatar({ name }: { name: string }) {
   const initials = name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
   const palettes = [
@@ -124,24 +114,19 @@ function MemberAvatar({ name }: { name: string }) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-// 🏛️ Next.js 15: searchParams is a Promise
 export default async function Home(props: {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  // 1. Unwrap searchParams to read URL state
   const searchParams = await props.searchParams;
 
-  // 2. Extract ALL parameters (BI Range + Directory Filters)
+  // 1. Extract ALL parameters
   const range = (searchParams?.range as string) || "30d";
   const query = (searchParams?.q as string) || "";
   const status = (searchParams?.status as string) || undefined;
   const tier = (searchParams?.tier as string) || undefined;
   const page = Number(searchParams?.page) || 1;
 
-  /**
-   * 🏛️ ARCHITECTURE KINDNESS: Parallel Execution
-   * Fire all queries simultaneously to eliminate the "Waterfall" lag.
-   */
+  // 2. Optimized Parallel Execution
   const [
     stats,
     financials,
@@ -164,7 +149,6 @@ export default async function Home(props: {
     getMembers({ range, page, query, status, tier })
   ]);
 
-  // 3. Extract paginated results
   const members = membersResult.data as SerializedMember[];
   const metadata = membersResult.metadata;
 
@@ -182,9 +166,7 @@ export default async function Home(props: {
               <p className="text-base font-black text-white tracking-tight">
                 Iron<span className="text-emerald-400">BI</span>
               </p>
-              <p className="text-[9px] text-zinc-500 uppercase tracking-[0.15em] font-bold mt-0.5">
-                Terminal
-              </p>
+              <p className="text-[9px] text-zinc-500 uppercase tracking-[0.15em] font-bold mt-0.5">Terminal</p>
             </div>
           </div>
 
@@ -204,20 +186,16 @@ export default async function Home(props: {
       {/* ── MAIN ────────────────────────────────────────────────────────── */}
       <main className="flex-1 w-full max-w-6xl mx-auto px-6 py-10">
 
-        {/* --- COMMAND CENTER HEADER & FILTERS --- */}
+        {/* --- HEADER --- */}
         <div className="mb-10 flex flex-col sm:flex-row sm:items-end justify-between gap-6">
           <div>
-            <h1 className="text-3xl font-black text-white tracking-tight">
-              Command Center
-            </h1>
-            <p className="text-sm text-zinc-500 mt-1.5">
-              Real-time operations and revenue intelligence for your facility.
-            </p>
+            <h1 className="text-3xl font-black text-white tracking-tight">Command Center</h1>
+            <p className="text-sm text-zinc-500 mt-1.5">Real-time operations and revenue intelligence.</p>
           </div>
           <DateFilter />
         </div>
 
-        {/* ZONE 1: EXECUTIVE PULSE (High-level metrics) */}
+        {/* ZONE 1: EXECUTIVE PULSE */}
         <SectionDivider label="Executive Pulse" />
         <StatsGrid
           total={stats.totalMembers}
@@ -227,11 +205,11 @@ export default async function Home(props: {
         />
         <FinancialHealth arpu={financials.arpu} cltv={financials.cltv} />
 
-        {/* ZONE 2: OPERATIONS DESK (Daily tasks: Register & Directory) */}
+        {/* ZONE 2: OPERATIONS DESK */}
         <SectionDivider label="Operations Desk" />
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
 
-          {/* Left: Registration (1/3 width) */}
+          {/* Left: Registration */}
           <div className="xl:col-span-4 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6 xl:sticky xl:top-24">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center">
@@ -245,39 +223,34 @@ export default async function Home(props: {
             <RegistrationForm />
           </div>
 
-          {/* Right: Paginated Member Directory (2/3 width) */}
-          <div className="xl:col-span-8 rounded-2xl border border-zinc-800 bg-zinc-900/50 overflow-hidden">
-            <div className="px-6 py-4 flex items-center justify-between bg-zinc-900">
+          {/* Right: Directory - 🏛️ PRO FIX: We removed 'overflow-hidden' from main card to let menus float */}
+          <div className="xl:col-span-8 rounded-2xl border border-zinc-800 bg-zinc-900/50 relative">
+            <div className="px-6 py-4 flex items-center justify-between bg-zinc-900 rounded-t-2xl border-b border-zinc-800">
               <div>
                 <h3 className="text-sm font-bold text-zinc-100">Live Directory</h3>
                 <p className="text-[10px] text-zinc-500 mt-0.5">Search and manage active members</p>
               </div>
               <span className="text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1.5 rounded-full">
-                {metadata.total} Total Matches
+                {metadata.total} Matches
               </span>
             </div>
 
-            {/* 🏛️ Search, Filter, and Pagination UI */}
             <DirectoryControls totalPages={metadata.totalPages} currentPage={metadata.currentPage} />
 
-            <div className="overflow-x-auto">
+            {/* 🏛️ PRO FIX: xl:overflow-visible ensures menus float, overflow-x-auto stays for mobile */}
+            <div className="xl:overflow-visible overflow-x-auto">
               <table className="w-full text-sm text-left">
                 <thead>
                   <tr className="text-[9px] font-black uppercase tracking-[0.15em] text-zinc-500 bg-zinc-950/50">
                     <th className="px-6 py-3">Member Details</th>
-                    <th className="px-4 py-3">Account Status</th>
+                    <th className="px-4 py-3 text-center relative z-0">Account Status</th>
                     <th className="px-6 py-3 text-right">Terminal Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-800/50">
                   {members.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="px-6 py-12 text-center">
-                        <div className="flex flex-col items-center gap-3">
-                          <DumbbellIcon className="w-8 h-8 text-zinc-700" />
-                          <span className="text-sm text-zinc-500">No members found matching these filters.</span>
-                        </div>
-                      </td>
+                      <td colSpan={3} className="px-6 py-12 text-center text-zinc-500">No members found.</td>
                     </tr>
                   ) : (
                     members.map((member: SerializedMember) => (
@@ -294,7 +267,9 @@ export default async function Home(props: {
                           </div>
                         </td>
                         <td className="px-4 py-4">
-                          <StatusBadge status={member.status} />
+                          <div className="flex justify-center">
+                            <StatusEditor memberId={member.id} currentStatus={member.status} />
+                          </div>
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex justify-end gap-2 opacity-90 group-hover:opacity-100 transition-opacity">
@@ -311,7 +286,7 @@ export default async function Home(props: {
           </div>
         </div>
 
-        {/* ZONE 3: BUSINESS INTELLIGENCE (Charts & Trends) */}
+        {/* ZONE 3: BUSINESS INTELLIGENCE */}
         <SectionDivider label="Business Intelligence" />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
           <div className="space-y-8">
@@ -325,13 +300,13 @@ export default async function Home(props: {
           </div>
         </div>
 
-        {/* ZONE 4: RETENTION MACHINE LEARNING (The Showstopper) */}
-        <SectionDivider label="Long-term Retention Analytics" />
+        {/* ZONE 4: RETENTION ANALYTICS */}
+        <SectionDivider label="Long-term Retention" />
         <CohortMatrix data={cohortData} />
 
       </main>
 
-      {/* ── FOOTER ──────────────────────────────────────────────────────── */}
+      {/* --- FOOTER --- */}
       <footer className="w-full border-t border-zinc-800 mt-12 bg-zinc-950/50">
         <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">

@@ -38,7 +38,6 @@ export async function loginAsMember(formData: FormData): Promise<LoginResult> {
         const headerList = await headers();
         const ip = headerList.get("x-forwarded-for") || "127.0.0.1";
 
-        // Isolate member attempts from admin attempts in Redis
         const { success } = await loginRateLimiter.limit(`member_login_${ip}`);
 
         if (!success) {
@@ -52,10 +51,6 @@ export async function loginAsMember(formData: FormData): Promise<LoginResult> {
         });
 
         if (!member) {
-            /**
-             * SECURE HANDSHAKE: Generic error prevents "Email Harvesting."
-             * We don't confirm if the email exists to protect student privacy.
-             */
             return { error: "Invalid credentials. Access denied." };
         }
 
@@ -75,7 +70,6 @@ export async function loginAsMember(formData: FormData): Promise<LoginResult> {
 
 /**
  * STRATEGY: Create a new member with strict validation.
- * BI GOAL: Revalidate the dashboard so charts reflect the new member immediately.
  */
 export async function createMember(formData: MemberInput) {
     const validatedFields = MemberSchema.safeParse(formData);
@@ -97,7 +91,6 @@ export async function createMember(formData: MemberInput) {
             },
         });
 
-        // KINDNESS: Update the Home Dashboard and Member List
         revalidatePath("/");
         revalidatePath("/dashboard/members");
 
@@ -115,32 +108,68 @@ export async function createMember(formData: MemberInput) {
 }
 
 /**
- * BI GOAL: Track gym utilization.
- * Updates the 'Today's Foot Traffic' chart in real-time.
+ * 🏛️ NEW BI FEATURE: Membership Lifecycle Management
+ * BI GOAL: Allow Admin to edit status and Member to self-cancel.
+ * Updates the churn and active member metrics in real-time.
+ */
+export async function updateMemberStatus(
+    memberId: string,
+    status: "ACTIVE" | "INACTIVE" | "CANCELLED"
+) {
+    try {
+        await prisma.member.update({
+            where: { id: memberId },
+            data: { status },
+        });
+
+        // KINDNESS: Refresh every related view
+        revalidatePath("/"); // Admin Dashboard
+        revalidatePath(`/members/${memberId}`); // Admin Drill-down
+        revalidatePath(`/portal/${memberId}`); // Member Portal View
+
+        return { success: true };
+    } catch (error) {
+        console.error("STATUS_UPDATE_ERROR:", error);
+        return { error: "Failed to update membership status." };
+    }
+}
+
+/**
+ * 🏛️ UPDATED FEATURE: Identity-Aware Attendance
+ * BI GOAL: Track gym utilization and return member identity for scanners.
  */
 export async function logAttendance(memberId: string) {
     try {
+        // 🏛️ FIX: We use 'include' to pull the member name in the same query
         const attendance = await prisma.attendance.create({
             data: {
                 memberId: memberId,
                 location: "Main Floor",
             },
+            include: {
+                member: {
+                    select: { name: true }
+                }
+            }
         });
 
-        // KINDNESS: Trigger revalidation for BI visuals and the user's portal
         revalidatePath("/");
         revalidatePath(`/portal/${memberId}`);
+        revalidatePath(`/members/${memberId}`);
 
-        return { success: true, data: JSON.parse(JSON.stringify(attendance)) };
+        return {
+            success: true,
+            name: attendance.member.name, // 🏛️ Required for the QR Scanner UI
+            data: JSON.parse(JSON.stringify(attendance))
+        };
     } catch (error) {
         console.error("ATTENDANCE_ERROR:", error);
-        return { error: "Failed to log attendance." };
+        return { error: "Failed to log attendance. Ensure Member ID is valid." };
     }
 }
 
 /**
  * BI GOAL: Capture financial "Value" events.
- * Atomic Transaction ensures the Revenue Trend chart stays accurate.
  */
 export async function logTransaction(memberId: string, amount: number, type: string) {
     try {
@@ -154,9 +183,9 @@ export async function logTransaction(memberId: string, amount: number, type: str
             }),
         ]);
 
-        // KINDNESS: Refresh charts for Revenue Trend and Goal Progress
         revalidatePath("/");
         revalidatePath(`/portal/${memberId}`);
+        revalidatePath(`/members/${memberId}`);
 
         return { success: true, data: JSON.parse(JSON.stringify(result[0])) };
     } catch (error) {
@@ -176,14 +205,12 @@ export async function deleteMember(id: string) {
             prisma.member.delete({ where: { id } }),
         ]);
 
-        // We revalidate before redirecting to ensure the list is updated
         revalidatePath("/");
     } catch (error) {
         console.error("DELETE_ERROR:", error);
         return { error: "Failed to delete member data." };
     }
 
-    // ARCHITECTURE NOTE: redirect() must be called outside of try/catch
     redirect("/");
 }
 

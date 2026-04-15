@@ -22,9 +22,9 @@ export function DeleteMemberButton({ memberId }: { memberId: string }) {
         <button
             onClick={handleDelete}
             disabled={isDeleting}
-            className="w-full mt-12 py-3 border border-red-200 dark:border-red-900/30 
-                 text-red-600 dark:text-red-400 text-xs font-bold uppercase tracking-widest
-                 rounded-xl hover:bg-red-50 dark:hover:bg-red-950/20 transition-all
+            /* 🏛️ FIX: Stripped light mode. Locked to border-red-900/30 and text-red-400 */
+            className="w-full py-3 border border-red-900/30 text-red-400 text-xs font-bold uppercase tracking-widest
+                 rounded-xl hover:bg-red-950/30 hover:border-red-500/50 transition-all
                  disabled:opacity-50 disabled:cursor-wait"
         >
             {isDeleting ? "Wiping Data..." : "Delete Member Profile"}

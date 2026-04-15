@@ -25,18 +25,19 @@ export function TierDistributionChart({ data }: { data: TierData[] }) {
         return () => clearTimeout(timer);
     }, []);
 
-    // Loading State: Matches the height of the actual chart for layout stability
+    // Loading State: 🏛️ FIX: Stripped bg-white and dark: classes. Locked to bg-zinc-900.
     if (!isMounted) {
         return (
-            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 h-80 animate-pulse flex items-center justify-center">
-                <div className="w-32 h-32 rounded-full border-8 border-zinc-100 dark:border-zinc-800" />
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 h-80 animate-pulse flex items-center justify-center">
+                <div className="w-32 h-32 rounded-full border-8 border-zinc-800" />
             </div>
         );
     }
 
     return (
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm h-80 flex flex-col transition-all hover:border-zinc-300 dark:hover:border-zinc-700">
-            <h3 className="font-bold text-slate-800 dark:text-zinc-200 mb-1">Membership Tiers</h3>
+        /* 🏛️ FIX: Locked container to bg-zinc-900 / border-zinc-800 permanently */
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm h-80 flex flex-col transition-all hover:border-zinc-700">
+            <h3 className="font-bold text-zinc-200 mb-1">Membership Tiers</h3>
             <p className="text-[11px] text-zinc-500 uppercase tracking-widest font-medium mb-4">
                 Segment Distribution
             </p>
@@ -52,11 +53,6 @@ export function TierDistributionChart({ data }: { data: TierData[] }) {
                             dataKey="value"
                             stroke="none"
                             animationDuration={1200}
-                            /**
-                             * ARCHITECTURE KINDNESS: Moved cornerRadius here.
-                             * Placing it on the Pie component satisfies TypeScript 
-                             * and applies the rounding to all segments globally.
-                             */
                             cornerRadius={6}
                         >
                             {data.map((entry, index) => (
@@ -74,7 +70,7 @@ export function TierDistributionChart({ data }: { data: TierData[] }) {
                                 backgroundColor: '#18181b', // zinc-900
                                 color: '#f4f4f5', // zinc-100
                                 fontSize: '12px',
-                                boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.3)'
+                                boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.5)'
                             }}
                             itemStyle={{ color: '#f4f4f5' }}
                         />
@@ -83,7 +79,8 @@ export function TierDistributionChart({ data }: { data: TierData[] }) {
                             align="center"
                             iconType="circle"
                             formatter={(value) => (
-                                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-tighter">
+                                /* 🏛️ FIX: Standardized legend text color for dark mode */
+                                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-tighter">
                                     {value}
                                 </span>
                             )}

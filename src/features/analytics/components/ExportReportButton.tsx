@@ -94,7 +94,8 @@ export function ExportReportButton({ data }: { data: ExportData }) {
         <button
             onClick={generatePDF}
             disabled={isGenerating}
-            className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs font-bold uppercase tracking-widest text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all active:scale-95 shadow-sm disabled:opacity-50"
+            /* 🏛️ FIX: Stripped light mode classes. Locked permanently to bg-zinc-900 / border-zinc-800 */
+            className="flex items-center gap-2 px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-xs font-bold uppercase tracking-widest text-zinc-400 hover:bg-zinc-800 transition-all active:scale-95 shadow-sm disabled:opacity-50"
         >
             {isGenerating ? (
                 <Download className="w-3.5 h-3.5 animate-bounce" />

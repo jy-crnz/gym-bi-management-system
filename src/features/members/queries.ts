@@ -346,6 +346,7 @@ export async function getMembershipDistribution(range: string = "30d") {
 
 export async function getChurnRiskMembers(range?: string) {
     try {
+        const now = new Date();
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
@@ -357,11 +358,34 @@ export async function getChurnRiskMembers(range?: string) {
                     { attendance: { every: { checkIn: { lt: sevenDaysAgo } } } }
                 ]
             },
+            include: {
+                // 🏛️ We need the last attendance to calculate the days
+                attendance: {
+                    orderBy: { checkIn: 'desc' },
+                    take: 1
+                }
+            },
             take: 5,
             orderBy: { createdAt: 'asc' }
         });
 
-        return JSON.parse(JSON.stringify(atRisk));
+        // 🏛️ CALCULATE THE DAYS MANUALLY BEFORE RETURNING
+        const formattedMembers = atRisk.map(member => {
+            const lastAttendance = member.attendance[0]?.checkIn;
+            const lastDate = lastAttendance ? new Date(lastAttendance) : new Date(member.createdAt);
+
+            // Calculate difference in days
+            const diffTime = Math.abs(now.getTime() - lastDate.getTime());
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            return {
+                ...member,
+                daysInactive: diffDays, // This adds the missing variable!
+                lastCheckIn: lastAttendance || null
+            };
+        });
+
+        return JSON.parse(JSON.stringify(formattedMembers));
     } catch (error) {
         console.error("CHURN_QUERY_ERROR:", error);
         return [];
@@ -385,7 +409,6 @@ export async function getMemberByEmail(email: string) {
         return null;
     }
 }
-
 export async function getMemberById(id: string) {
     try {
         const member = await prisma.member.findUnique({
@@ -398,7 +421,36 @@ export async function getMemberById(id: string) {
 
         if (!member) return null;
 
-        return JSON.parse(JSON.stringify(member));
+        // 🏛️ BI LOGIC: Dynamic Churn Calculation
+        const now = new Date();
+        const lastCheckIn = member.attendance[0]?.checkIn;
+        const referenceDate = lastCheckIn ? new Date(lastCheckIn) : new Date(member.createdAt);
+
+        const diffTime = Math.abs(now.getTime() - referenceDate.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        /**
+         * 🧠 Risk Algorithm:
+         * 0-7 days: 5% (Healthy)
+         * 8-14 days: 25% (Warning)
+         * 15-30 days: 60% (High Risk)
+         * 30+ days: 90%+ (Critical)
+         */
+        let calculatedRisk = 0.05; // Base risk
+
+        if (diffDays > 30) {
+            calculatedRisk = 0.95;
+        } else if (diffDays > 14) {
+            calculatedRisk = 0.60;
+        } else if (diffDays > 7) {
+            calculatedRisk = 0.25;
+        }
+
+        // Return the member with the REAL calculated score
+        return JSON.parse(JSON.stringify({
+            ...member,
+            churnRiskScore: calculatedRisk
+        }));
     } catch (error) {
         console.error("GET_MEMBER_ERROR:", error);
         return null;
