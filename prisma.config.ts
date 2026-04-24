@@ -5,8 +5,11 @@ config();
 
 export default defineConfig({
     schema: "./prisma/schema.prisma",
+    // 🏛️ ARCHITECTURE FIX: The official home for the seed command in Prisma v7
+    migrations: {
+        seed: 'tsx ./prisma/seed.ts',
+    },
     datasource: {
-        // This is the new home for your connection URL
         url: env("DATABASE_URL"),
     },
 });

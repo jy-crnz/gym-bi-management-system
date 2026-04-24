@@ -39,12 +39,12 @@ exports.Prisma = Prisma
 exports.$Enums = {}
 
 /**
- * Prisma Client JS version: 7.7.0
- * Query Engine version: 75cbdc1eb7150937890ad5465d861175c6624711
+ * Prisma Client JS version: 7.8.0
+ * Query Engine version: 3c6e192761c0362d496ed980de936e2f3cebcd3a
  */
 Prisma.prismaVersion = {
-  client: "7.7.0",
-  engine: "75cbdc1eb7150937890ad5465d861175c6624711"
+  client: "7.8.0",
+  engine: "3c6e192761c0362d496ed980de936e2f3cebcd3a"
 }
 
 Prisma.PrismaClientKnownRequestError = PrismaClientKnownRequestError;
@@ -175,8 +175,8 @@ exports.Prisma.ModelName = {
  */
 const config = {
   "previewFeatures": [],
-  "clientVersion": "7.7.0",
-  "engineVersion": "75cbdc1eb7150937890ad5465d861175c6624711",
+  "clientVersion": "7.8.0",
+  "engineVersion": "3c6e192761c0362d496ed980de936e2f3cebcd3a",
   "activeProvider": "postgresql",
   "inlineSchema": "datasource db {\n  provider = \"postgresql\"\n}\n\ngenerator client {\n  provider = \"prisma-client-js\"\n  output   = \"../src/generated/client\"\n}\n\n// 🏛️ NEW: Replaced arbitrary Tiers with exact Business Offerings\nenum PassType {\n  DAY_PASS\n  MONTHLY\n}\n\nenum MemberStatus {\n  ACTIVE\n  INACTIVE\n  CANCELLED\n}\n\n// DIMENSION: Member Profile (The \"Who\")\nmodel Member {\n  id     String       @id @default(cuid())\n  name   String\n  email  String       @unique\n  status MemberStatus @default(ACTIVE)\n\n  // 🏛️ NEW: Real-world Access & Billing Control\n  passType    PassType  @default(DAY_PASS)\n  activeUntil DateTime? // The exact moment their pass or month expires\n\n  // BI Enrichment Fields\n  churnRiskScore Float   @default(0.0)\n  totalSpent     Decimal @default(0)\n\n  attendance   Attendance[]\n  transactions Transaction[]\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n}\n\n// FACT: Attendance Logs (The \"Behavior\")\nmodel Attendance {\n  id       String @id @default(cuid())\n  memberId String\n  member   Member @relation(fields: [memberId], references: [id])\n\n  checkIn  DateTime  @default(now())\n  checkOut DateTime?\n  location String    @default(\"Main Floor\")\n\n  createdAt DateTime @default(now())\n}\n\n// FACT: Transactions (The \"Value\")\nmodel Transaction {\n  id       String  @id @default(cuid())\n  memberId String\n  member   Member  @relation(fields: [memberId], references: [id])\n  amount   Decimal\n  type     String // Will now be explicitly \"Day Pass\" or \"Monthly Renewal\"\n\n  createdAt DateTime @default(now())\n}\n\nmodel SystemSettings {\n  id          String   @id @default(\"settings\")\n  revenueGoal Decimal  @default(50000)\n  updatedAt   DateTime @updatedAt\n}\n\nmodel AuditLog {\n  id        String   @id @default(cuid())\n  action    String // e.g., \"MEMBER_DELETE\", \"GOAL_UPDATE\", \"STATUS_CHANGE\"\n  entityId  String? // The ID of the member or setting changed\n  details   String // A human-readable description of what happened\n  adminName String // Who did it (can be hardcoded for now or from your auth)\n  createdAt DateTime @default(now())\n}\n"
 }

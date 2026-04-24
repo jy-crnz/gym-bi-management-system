@@ -4,10 +4,14 @@
   "type": "module",
   "private": true,
 "scripts": {
+  "dev": "next dev",
   "postinstall": "prisma generate",
   "build": "next build",
   "start": "next start",
   "lint": "next lint"
+},
+"prisma": {
+  "seed": "tsx prisma/seed.ts"
 },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
