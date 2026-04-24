@@ -1,3 +1,7 @@
+// 🏛️ ARCHITECTURE IS KINDNESS: Force Real-Time Data. 
+// Prevents the "Time Capsule" bug where production caches daysInactive.
+export const dynamic = "force-dynamic";
+
 import { getChurnRiskMembers } from "@/features/members/queries";
 import { UserMinus, ArrowLeft, Mail } from "lucide-react";
 import Link from "next/link";
@@ -12,7 +16,7 @@ interface AtRiskMember {
 }
 
 export default async function RetentionReportPage() {
-    // Fetch data on the server
+    // Fetch data on the server (now guaranteed to run on every request)
     const atRiskMembers = await getChurnRiskMembers() as AtRiskMember[];
 
     return (

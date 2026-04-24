@@ -1,0 +1,101 @@
+# Gym Business Intelligence (BI) System - Complete Documentation
+
+## 1. Introduction & Purpose
+The **Gym Business Intelligence (BI) System** is a comprehensive, full-stack web application tailored for managing gym operations and extracting actionable insights from member behavior. It handles membership tracking, automated check-ins/check-outs via QR codes, transaction processing, and provides advanced business intelligence tools for analyzing revenue trends, cohort retention, and churn risk.
+
+## 2. Technology Stack
+
+### Frontend & Core Framework
+*   **Framework:** Next.js v16.2 (App Router)
+*   **UI Library:** React v19.2
+*   **Language:** TypeScript v5
+*   **Styling:** Tailwind CSS v4 with `tailwindcss-animate`
+*   **Icons:** Lucide React
+*   **Animations:** Framer Motion
+
+### Backend & Database
+*   **Database:** PostgreSQL
+*   **ORM:** Prisma v7.7 (`@prisma/client`, `@prisma/adapter-pg`)
+*   **BaaS & SSR:** Supabase (`@supabase/ssr`, `@supabase/supabase-js`)
+*   **Postgres Client:** `pg` (Non-blocking client for Node.js)
+*   **Rate Limiting:** Upstash Redis & Ratelimit
+
+### Utilities & Libraries
+*   **Forms & Validation:** React Hook Form (`react-hook-form`), Hookform Resolvers (`@hookform/resolvers`)
+*   **Charts & Visualization:** Recharts
+*   **PDF Generation:** jsPDF, jsPDF-AutoTable
+*   **Date Handling:** date-fns
+*   **QR Codes:** `qrcode.react` (generation), `html5-qrcode` (scanning)
+*   **Authentication:** NextAuth (v4.24.13)
+
+---
+
+## 3. Architecture & Folder Structure
+The application follows a strictly modular **Feature-Based Architecture**. Each domain of the application is isolated within the `src/features/` directory, containing its own actions, components, queries, schemas, and types.
+
+### Key Directories:
+*   `src/app/`: Next.js App Router definitions.
+    *   `/dashboard`: Main application dashboard.
+    *   `/admin`: Administrative panel.
+    *   `/login`: User authentication portal.
+    *   `/members/[id]`: Individual member profiles.
+    *   `/portal/[id]`: Member-facing attendance portal.
+    *   `/reports/retention`: BI reports.
+    *   `/api/auth/[...nextauth]`: NextAuth endpoints.
+*   `src/features/`: Modular domains of the application.
+    *   `analytics/`: BI queries, dashboard components (CohortMatrix, FinancialHealth).
+    *   `auth/`: Authentication actions, UI components, and Supabase integrations.
+    *   `inventory/`: Management of physical gym items.
+    *   `members/`: Member CRUD, QR generation/scanning, churn risk logic.
+    *   `portal/`: UI and actions for member check-ins.
+    *   `transactions/`: Financial data tracking and schemas.
+*   `prisma/`: Database schemas, seeds, and migrations.
+*   `src/lib/`: Shared utilities (Prisma client instantiation, rate limiting, generic utils).
+*   `src/generated/client/`: Custom output path for the Prisma Client.
+
+---
+
+## 4. Database Schema (Prisma)
+The database is structured to support both operational functionality and Business Intelligence processing, separating data into Dimension and Fact models.
+
+### Dimension Models (The "Who")
+*   **Member:**
+    *   Tracks standard data: `name`, `email`, `status` (ACTIVE, INACTIVE, CANCELLED).
+    *   Tracks BI Data: `churnRiskScore`, `totalSpent`, `tier` (BASIC, PREMIUM, VIP).
+*   **SystemSettings:**
+    *   Stores global configurations like the dynamic `revenueGoal`.
+
+### Fact Models (The "Behavior & Value")
+*   **Attendance:**
+    *   Logs member presence.
+    *   Includes `checkIn`, `checkOut`, and `location` for facility utilization and peak-hour analysis.
+*   **Transaction:**
+    *   Logs financial events (`amount`, `type`) linked directly to members.
+
+---
+
+## 5. Key Features
+
+### Business Intelligence & Analytics
+*   **Cohort Analysis:** Visualizes member retention over time.
+*   **Financial Health:** Tracks revenue against dynamic system goals.
+*   **Churn Risk:** Uses member data to identify and flag accounts likely to cancel.
+*   **Peak Hours Tracking:** Analyzes attendance data to visualize facility utilization.
+*   **Automated Reporting:** Generates downloadable PDF reports for retention and key statistics.
+
+### Member Management & Operations
+*   **QR Code System:** Dynamic QR code generation for members and a browser-based QR scanner for the portal to facilitate touchless check-ins.
+*   **Tier & Goal Tracking:** Monitors member progress and membership levels.
+*   **Transaction History:** Logs and categorizes all member spending.
+
+---
+
+## 6. Scripts & Commands
+Defined in `package.json` to handle the development lifecycle:
+
+*   `npm run dev`: Starts the Next.js development server.
+*   `npm run build`: Generates the Prisma client and builds the Next.js application for production.
+*   `npm start`: Starts the compiled production application.
+*   `npm run lint`: Runs ESLint to check for code quality and consistency.
+
+---

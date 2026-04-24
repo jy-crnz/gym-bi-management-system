@@ -33,6 +33,9 @@ import {
   getCohortRetention,
 } from "@/features/members/queries";
 
+// 🏛️ ARCHITECTURE IS KINDNESS: Force Real-Time Data.
+// This prevents Vercel/Next.js from taking a static snapshot of the dashboard.
+// Every visit will now query the live database, ensuring metrics are 100% accurate.
 export const dynamic = "force-dynamic";
 
 interface SerializedMember {
@@ -62,7 +65,7 @@ function DumbbellIcon({ className }: { className?: string }) {
 
 function LivePill() {
   return (
-    <div className="flex items-center gap-1.5 bg-zinc-800 border border-zinc-700 rounded-full px-3 py-1">
+    <div className="flex items-center gap-1.5 bg-zinc-800 border border-zinc-700 rounded-full px-3 py-1 shadow-sm">
       <span className="relative flex h-1.5 w-1.5">
         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
         <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
@@ -156,7 +159,7 @@ export default async function Home(props: {
     <div className="flex flex-col min-h-screen bg-zinc-950 font-sans selection:bg-emerald-500/30">
 
       {/* ── HEADER ──────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-30 w-full bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800">
+      <header className="sticky top-0 z-30 w-full bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800 shadow-sm">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 shrink-0">
             <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]">
@@ -224,7 +227,7 @@ export default async function Home(props: {
           </div>
 
           {/* Right: Directory - 🏛️ PRO FIX: We removed 'overflow-hidden' from main card to let menus float */}
-          <div className="xl:col-span-8 rounded-2xl border border-zinc-800 bg-zinc-900/50 relative">
+          <div className="xl:col-span-8 rounded-2xl border border-zinc-800 bg-zinc-900/50 relative shadow-sm">
             <div className="px-6 py-4 flex items-center justify-between bg-zinc-900 rounded-t-2xl border-b border-zinc-800">
               <div>
                 <h3 className="text-sm font-bold text-zinc-100">Live Directory</h3>
@@ -238,7 +241,7 @@ export default async function Home(props: {
             <DirectoryControls totalPages={metadata.totalPages} currentPage={metadata.currentPage} />
 
             {/* 🏛️ PRO FIX: xl:overflow-visible ensures menus float, overflow-x-auto stays for mobile */}
-            <div className="xl:overflow-visible overflow-x-auto">
+            <div className="xl:overflow-visible overflow-x-auto custom-scrollbar">
               <table className="w-full text-sm text-left">
                 <thead>
                   <tr className="text-[9px] font-black uppercase tracking-[0.15em] text-zinc-500 bg-zinc-950/50">

@@ -1,0 +1,32 @@
+# Gym Business Intelligence System - Progress Report
+
+## Project Status Overview
+The project is structurally well-defined and has a solid foundation utilizing Next.js (App Router), React, TypeScript, and Prisma with PostgreSQL/Supabase. The architecture follows a modular, feature-based approach.
+
+## Completed Core Features & Modules
+The system's modular architecture under `src/features/` indicates significant development across several key domains:
+
+1. **Analytics & Reporting**
+   - Core BI capabilities are implemented, including cohort analysis (`CohortMatrix.tsx`), financial health indicators (`FinancialHealth.tsx`), and export functionalities.
+   - Dedicated routing for retention reports exists (`src/app/reports/retention`).
+
+2. **Member Management**
+   - Comprehensive member operations are set up, including registration (`RegistrationForm.tsx`), detailed profile views (`src/app/members/[id]`), and goal tracking.
+   - Advanced BI UI components related to members such as `ChurnRiskList`, `PeakHoursChart`, `RevenueChart`, and `TierDistributionChart` are developed.
+   - QR code functionality (generation and scanning) is integrated for check-ins.
+
+3. **Portal & Attendance**
+   - A dedicated member/attendance portal is implemented with routes and components like `AttendanceCalendar` and `PortalLoginForm`.
+
+4. **Authentication**
+   - Authentication features are established with login forms and NextAuth/Supabase integration logic setup (`src/app/api/auth/[...nextauth]`).
+
+5. **Transactions & Inventory**
+   - Foundational actions, schemas, and queries are structured for handling financial transactions and inventory.
+
+## Database & Infrastructure
+- The Prisma schema is initialized and optimized for BI processing with clear Dimensional (Member) and Fact (Attendance, Transaction) models.
+- Initial migrations have been successfully generated and applied (`20260411044105_init_gym_schema`, `20260411051047_sync_attendance_schema`), indicating a stable database structure.
+
+## Summary
+The project is well past the initial setup phase. The core architecture is heavily developed with fully structured feature modules. The focus appears to have successfully transitioned from standard CRUD operations to advanced Business Intelligence visualizations and user-facing portal features.

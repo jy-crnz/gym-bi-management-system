@@ -93,6 +93,7 @@ export async function createMember(formData: MemberInput) {
 
         revalidatePath("/");
         revalidatePath("/dashboard/members");
+        revalidatePath("/reports/retention"); // 🏛️ NEW: Sync BI Reports
 
         return {
             success: true,
@@ -126,6 +127,7 @@ export async function updateMemberStatus(
         revalidatePath("/"); // Admin Dashboard
         revalidatePath(`/members/${memberId}`); // Admin Drill-down
         revalidatePath(`/portal/${memberId}`); // Member Portal View
+        revalidatePath("/reports/retention"); // 🏛️ NEW: Remove from churn list if cancelled
 
         return { success: true };
     } catch (error) {
@@ -140,7 +142,7 @@ export async function updateMemberStatus(
  */
 export async function logAttendance(memberId: string) {
     try {
-        // 🏛️ FIX: We use 'include' to pull the member name in the same query
+        // We use 'include' to pull the member name in the same query
         const attendance = await prisma.attendance.create({
             data: {
                 memberId: memberId,
@@ -156,10 +158,11 @@ export async function logAttendance(memberId: string) {
         revalidatePath("/");
         revalidatePath(`/portal/${memberId}`);
         revalidatePath(`/members/${memberId}`);
+        revalidatePath("/reports/retention"); // 🏛️ NEW: Instant removal from At-Risk list on check-in
 
         return {
             success: true,
-            name: attendance.member.name, // 🏛️ Required for the QR Scanner UI
+            name: attendance.member.name, // Required for the QR Scanner UI
             data: JSON.parse(JSON.stringify(attendance))
         };
     } catch (error) {
@@ -186,6 +189,7 @@ export async function logTransaction(memberId: string, amount: number, type: str
         revalidatePath("/");
         revalidatePath(`/portal/${memberId}`);
         revalidatePath(`/members/${memberId}`);
+        revalidatePath("/reports/retention"); // 🏛️ NEW: Sync BI Reports
 
         return { success: true, data: JSON.parse(JSON.stringify(result[0])) };
     } catch (error) {
@@ -206,6 +210,7 @@ export async function deleteMember(id: string) {
         ]);
 
         revalidatePath("/");
+        revalidatePath("/reports/retention"); // 🏛️ NEW: Sync BI Reports
     } catch (error) {
         console.error("DELETE_ERROR:", error);
         return { error: "Failed to delete member data." };
