@@ -126,8 +126,9 @@ export default async function MemberProfile({
                                     {/* 🏛️ NEW BI INDICATOR: Access Expiration */}
                                     <div className={`flex items-center gap-1.5 px-3 py-1 rounded-md border ${isExpired ? 'border-red-900/50 text-red-500 bg-red-500/5' : 'border-emerald-900/50 text-emerald-500 bg-emerald-500/5'}`}>
                                         <Clock className="w-3.5 h-3.5" />
+                                        {/* ✅ FIXED EXPIRATION LOGIC */}
                                         <span className="text-[10px] font-black uppercase tracking-widest">
-                                            {isExpired ? 'Expired' : `Active Until: ${expiryDate?.toLocaleDateString()}`}
+                                            {isExpired ? 'Expired' : `Active Until: ${expiryDate?.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' })}`}
                                         </span>
                                     </div>
                                 </div>
@@ -202,11 +203,25 @@ export default async function MemberProfile({
                                                 <div className="flex gap-4 items-center">
                                                     <div className="w-1 h-8 bg-emerald-500/20 group-hover:bg-emerald-500 rounded-full transition-all" />
                                                     <div>
-                                                        <p className="text-sm font-bold text-zinc-100">{new Date(log.checkIn).toLocaleDateString(undefined, { dateStyle: 'medium' })}</p>
+                                                        <p className="text-sm font-bold text-zinc-100">
+                                                            {new Date(log.checkIn).toLocaleDateString('en-PH', {
+                                                                timeZone: 'Asia/Manila',
+                                                                month: 'short',
+                                                                day: 'numeric',
+                                                                year: 'numeric'
+                                                            })}
+                                                        </p>
                                                         <p className="text-[10px] text-zinc-500 uppercase font-black tracking-widest">Standard Check-in</p>
                                                     </div>
                                                 </div>
-                                                <span className="text-xs font-black text-zinc-500 font-mono">{new Date(log.checkIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                <span className="text-xs font-black text-zinc-500 font-mono">
+                                                    {new Date(log.checkIn).toLocaleTimeString('en-PH', {
+                                                        timeZone: 'Asia/Manila',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit',
+                                                        hour12: true
+                                                    })}
+                                                </span>
                                             </div>
                                         ))
                                     )}
@@ -231,7 +246,11 @@ export default async function MemberProfile({
                                                     <div className="w-1 h-8 bg-blue-500/20 group-hover:bg-blue-500 rounded-full transition-all" />
                                                     <div>
                                                         <p className="text-sm font-bold text-zinc-100 uppercase italic">{tx.type.replace('_', ' ')}</p>
-                                                        <p className="text-[10px] text-zinc-500 uppercase font-black tracking-widest">{new Date(tx.createdAt).toLocaleDateString()}</p>
+                                                        <p className="text-[10px] text-zinc-500 uppercase font-black tracking-widest">
+                                                            {new Date(tx.createdAt).toLocaleDateString('en-PH', {
+                                                                timeZone: 'Asia/Manila'
+                                                            })}
+                                                        </p>
                                                     </div>
                                                 </div>
                                                 <span className="text-lg font-black text-emerald-400 tracking-tighter">+₱{Number(tx.amount).toLocaleString()}</span>
