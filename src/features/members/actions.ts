@@ -4,28 +4,47 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { MemberSchema, type MemberInput } from "./schemas";
-/* 🏛️ INFORMATION ASSURANCE: Security Imports */
+/* 🏛️ INFORMATION ASSURANCE: Security & Audit Imports */
 import { headers } from "next/headers";
 import { loginRateLimiter } from "@/lib/ratelimit";
+import { createAuditEntry } from "@/lib/audit";
 
-/**
- * ARCHITECTURE IS KINDNESS: Discriminated Union
- * Satisfies the PortalLoginForm import and ensures type-safe auth handshakes.
- */
 export type LoginResult =
     | { error: string; memberId?: never }
     | { memberId: string; error?: never };
 
 /**
- * ---------------------------------------------------------------------------
- * SECTION 1: AUTHENTICATION (Member Portal Handshake)
- * ---------------------------------------------------------------------------
+ * 🏛️ TEMPORAL CALIBRATION: The Offset Neutralizer
+ * completely bypasses the node-postgres local time hijack by injecting
+ * a reverse-offset shield into the Date object.
  */
+function getManilaMidnight(): Date {
+    const now = new Date();
 
-/**
- * STRATEGY: Member Verification with Rate Limiting.
- * IA GOAL: Prevent brute-force and email harvesting.
- */
+    // 1. Shift current time forward by 8 hours to get Manila time
+    const manilaTime = new Date(now.getTime() + (8 * 60 * 60 * 1000));
+
+    // 2. Extract the exact Manila Year, Month, and Day
+    const y = manilaTime.getUTCFullYear();
+    const m = String(manilaTime.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(manilaTime.getUTCDate()).padStart(2, '0');
+
+    // 3. We want the database to physically store 15:59:59 (which is Manila 23:59:59)
+    const targetUTC = new Date(`${y}-${m}-${d}T15:59:59.999Z`);
+
+    // 4. 🛡️ THE SHIELD: Neutralize the node-postgres local timezone hijack.
+    // We add the server's offset. When the pg driver subtracts the offset later, 
+    // it will perfectly cancel out and leave exactly 15:59:59.
+    const serverOffsetMs = targetUTC.getTimezoneOffset() * 60 * 1000;
+    const timezoneProofDate = new Date(targetUTC.getTime() + serverOffsetMs);
+
+    return timezoneProofDate;
+}
+
+// ---------------------------------------------------------------------------
+// SECTION 1: AUTHENTICATION
+// ---------------------------------------------------------------------------
+
 export async function loginAsMember(formData: FormData): Promise<LoginResult> {
     const email = formData.get("email") as string;
 
@@ -34,7 +53,6 @@ export async function loginAsMember(formData: FormData): Promise<LoginResult> {
     }
 
     try {
-        // ── 1. THE RADAR CHECK (Rate Limiting) ──
         const headerList = await headers();
         const ip = headerList.get("x-forwarded-for") || "127.0.0.1";
 
@@ -44,7 +62,6 @@ export async function loginAsMember(formData: FormData): Promise<LoginResult> {
             return { error: "Too many attempts. Please wait 60 seconds." };
         }
 
-        // ── 2. DATA VERIFICATION ──
         const member = await prisma.member.findUnique({
             where: { email },
             select: { id: true }
@@ -62,15 +79,10 @@ export async function loginAsMember(formData: FormData): Promise<LoginResult> {
     }
 }
 
-/**
- * ---------------------------------------------------------------------------
- * SECTION 2: MEMBER MANAGEMENT (Admin/Staff Operations)
- * ---------------------------------------------------------------------------
- */
+// ---------------------------------------------------------------------------
+// SECTION 2: MEMBER MANAGEMENT
+// ---------------------------------------------------------------------------
 
-/**
- * STRATEGY: Create a new member with strict validation.
- */
 export async function createMember(formData: MemberInput) {
     const validatedFields = MemberSchema.safeParse(formData);
 
@@ -81,19 +93,59 @@ export async function createMember(formData: MemberInput) {
         };
     }
 
+    // 🏛️ TEMPORAL CALIBRATION: Calculate Expiration
+    let activeUntil: Date;
+    if (validatedFields.data.passType === "MONTHLY") {
+        activeUntil = new Date();
+        activeUntil.setDate(activeUntil.getDate() + 30);
+    } else {
+        activeUntil = getManilaMidnight();
+    }
+
+    // BI Logic: Define prices for the initial transaction
+    const initialAmount = validatedFields.data.passType === "MONTHLY" ? 450 : 30;
+
     try {
-        const member = await prisma.member.create({
-            data: {
-                name: validatedFields.data.name,
-                email: validatedFields.data.email,
-                status: validatedFields.data.status,
-                tier: validatedFields.data.tier,
-            },
+        /**
+         * 🏛️ ATOMIC REGISTRATION: 
+         * We wrap both operations in a transaction. If the transaction fails, 
+         * the member is never created (prevents "orphan" members with no payment).
+         */
+        const member = await prisma.$transaction(async (tx) => {
+            // 1. Create the Member record
+            const newMember = await tx.member.create({
+                data: {
+                    name: validatedFields.data.name,
+                    email: validatedFields.data.email,
+                    status: validatedFields.data.status,
+                    passType: validatedFields.data.passType,
+                    activeUntil: activeUntil,
+                    totalSpent: initialAmount, // 🏛️ NEW: Sync the initial LTV
+                },
+            });
+
+            // 2. Create the initial Transaction record to fuel the LTV metric
+            await tx.transaction.create({
+                data: {
+                    memberId: newMember.id,
+                    amount: initialAmount,
+                    type: validatedFields.data.passType,
+                }
+            });
+
+            return newMember;
         });
+
+        // 🏛️ AUDIT TRAIL: Record the dual event
+        await createAuditEntry(
+            "MEMBER_CREATE",
+            `Registered ${member.name} (${member.passType}) and processed initial ₱${initialAmount} payment.`,
+            member.id
+        );
 
         revalidatePath("/");
         revalidatePath("/dashboard/members");
-        revalidatePath("/reports/retention"); // 🏛️ NEW: Sync BI Reports
+        revalidatePath("/reports/retention");
 
         return {
             success: true,
@@ -104,30 +156,32 @@ export async function createMember(formData: MemberInput) {
             return { error: "A member with this email already exists." };
         }
         console.error("DATABASE_ERROR:", error);
-        return { error: "An unexpected error occurred." };
+        return { error: "An unexpected error occurred during registration." };
     }
 }
 
-/**
- * 🏛️ NEW BI FEATURE: Membership Lifecycle Management
- * BI GOAL: Allow Admin to edit status and Member to self-cancel.
- * Updates the churn and active member metrics in real-time.
- */
 export async function updateMemberStatus(
     memberId: string,
     status: "ACTIVE" | "INACTIVE" | "CANCELLED"
 ) {
     try {
-        await prisma.member.update({
+        const member = await prisma.member.update({
             where: { id: memberId },
             data: { status },
+            select: { name: true }
         });
 
-        // KINDNESS: Refresh every related view
-        revalidatePath("/"); // Admin Dashboard
-        revalidatePath(`/members/${memberId}`); // Admin Drill-down
-        revalidatePath(`/portal/${memberId}`); // Member Portal View
-        revalidatePath("/reports/retention"); // 🏛️ NEW: Remove from churn list if cancelled
+        // 🏛️ AUDIT TRAIL: Record status change
+        await createAuditEntry(
+            "MEMBER_STATUS_CHANGE",
+            `Manual status update for ${member.name}: Changed to ${status}`,
+            memberId
+        );
+
+        revalidatePath("/");
+        revalidatePath(`/members/${memberId}`);
+        revalidatePath(`/portal/${memberId}`);
+        revalidatePath("/reports/retention");
 
         return { success: true };
     } catch (error) {
@@ -137,80 +191,169 @@ export async function updateMemberStatus(
 }
 
 /**
- * 🏛️ UPDATED FEATURE: Identity-Aware Attendance
- * BI GOAL: Track gym utilization and return member identity for scanners.
+ * 🏛️ FINANCIAL ENGINE: Process Payment & Renew Pass
+ * Automatically extends the pass, records the revenue, and leaves an audit footprint.
+ */
+export async function processPayment(memberId: string, amount: number, type: "DAY_PASS" | "MONTHLY") {
+    try {
+        const member = await prisma.member.findUnique({
+            where: { id: memberId },
+            select: { name: true, activeUntil: true }
+        });
+
+        if (!member) return { error: "Member not found." };
+
+        // 1. 🕒 TEMPORAL CALIBRATION: Timezone-Aware Expiration
+        const now = new Date();
+        const currentExpiry = member.activeUntil ? new Date(member.activeUntil) : now;
+
+        let newExpiry: Date;
+        if (type === "MONTHLY") {
+            const baseDate = currentExpiry > now ? currentExpiry : now;
+            newExpiry = new Date(baseDate);
+            newExpiry.setDate(newExpiry.getDate() + 30);
+        } else {
+            // Day passes shouldn't stack for days, they expire tonight at Manila Midnight.
+            newExpiry = getManilaMidnight();
+        }
+
+        // 2. 💰 ATOMIC TRANSACTION: Update time AND record money simultaneously
+        await prisma.$transaction([
+            prisma.member.update({
+                where: { id: memberId },
+                data: {
+                    activeUntil: newExpiry,
+                    status: "ACTIVE",
+                    passType: type,
+                    totalSpent: { increment: amount } // 🏛️ NEW: Automatically add to their LTV
+                }
+            }),
+            prisma.transaction.create({
+                data: {
+                    memberId: memberId,
+                    amount: amount,
+                    type: type
+                }
+            })
+        ]);
+
+        // 3. 📜 THE FINANCIAL FOOTPRINT
+        await createAuditEntry(
+            "FINANCIAL_TRANSACTION",
+            `Processed ₱${amount} payment for ${member.name} (${type === "MONTHLY" ? "Monthly" : "Day Pass"}). Pass extended to ${newExpiry.toLocaleDateString()}.`,
+            memberId
+        );
+
+        revalidatePath("/");
+        revalidatePath(`/members/${memberId}`);
+        revalidatePath("/reports/retention");
+
+        return { success: true };
+    } catch (error) {
+        console.error("PAYMENT_ERROR:", error);
+        return { error: "Failed to process payment and update pass." };
+    }
+}
+
+/**
+ * 🏛️ logAttendance: THE HARDENED BOUNCER
+ * Added: Cooldown logic to prevent duplicate check-ins.
  */
 export async function logAttendance(memberId: string) {
     try {
-        // We use 'include' to pull the member name in the same query
-        const attendance = await prisma.attendance.create({
-            data: {
+        const now = new Date();
+
+        // 1. 🔍 THE HANDSHAKE
+        const member = await prisma.member.findUnique({
+            where: { id: memberId },
+            select: {
+                name: true,
+                status: true,
+                activeUntil: true
+            }
+        });
+
+        if (!member) return { error: "Invalid ID. Member not found." };
+
+        // 2. 🛡️ THE TEMPORAL GATE (Midnight Check)
+        const expiryDate = member.activeUntil ? new Date(member.activeUntil) : null;
+        const isExpired = expiryDate ? expiryDate < now : true;
+
+        if (member.status !== "ACTIVE" || isExpired) {
+            return {
+                error: `ACCESS DENIED: ${member.name}'s pass has expired.`,
+                code: "EXPIRED"
+            };
+        }
+
+        // 3. 🧊 THE COOLDOWN GUARD (New Logic)
+        const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000);
+
+        const recentCheckIn = await prisma.attendance.findFirst({
+            where: {
                 memberId: memberId,
-                location: "Main Floor",
-            },
-            include: {
-                member: {
-                    select: { name: true }
+                createdAt: {
+                    gte: fifteenMinutesAgo
                 }
             }
         });
 
+        if (recentCheckIn) {
+            return {
+                error: "COOLDOWN: You already checked in recently.",
+                code: "COOLDOWN"
+            };
+        }
+
+        // 4. ✅ VALIDATED: Create the attendance record
+        await prisma.attendance.create({
+            data: {
+                memberId: memberId,
+                location: "Main Floor",
+            }
+        });
+
         revalidatePath("/");
-        revalidatePath(`/portal/${memberId}`);
         revalidatePath(`/members/${memberId}`);
-        revalidatePath("/reports/retention"); // 🏛️ NEW: Instant removal from At-Risk list on check-in
 
         return {
             success: true,
-            name: attendance.member.name, // Required for the QR Scanner UI
-            data: JSON.parse(JSON.stringify(attendance))
+            name: member.name,
         };
+
     } catch (error) {
         console.error("ATTENDANCE_ERROR:", error);
-        return { error: "Failed to log attendance. Ensure Member ID is valid." };
+        return { error: "System error during check-in." };
     }
 }
 
-/**
- * BI GOAL: Capture financial "Value" events.
- */
-export async function logTransaction(memberId: string, amount: number, type: string) {
-    try {
-        const result = await prisma.$transaction([
-            prisma.transaction.create({
-                data: { memberId, amount, type },
-            }),
-            prisma.member.update({
-                where: { id: memberId },
-                data: { totalSpent: { increment: amount } },
-            }),
-        ]);
-
-        revalidatePath("/");
-        revalidatePath(`/portal/${memberId}`);
-        revalidatePath(`/members/${memberId}`);
-        revalidatePath("/reports/retention"); // 🏛️ NEW: Sync BI Reports
-
-        return { success: true, data: JSON.parse(JSON.stringify(result[0])) };
-    } catch (error) {
-        console.error("TRANSACTION_ERROR:", error);
-        return { error: "Failed to process payment." };
-    }
-}
-
-/**
- * IA GOAL: Secure data disposal.
- */
 export async function deleteMember(id: string) {
     try {
+        // 1. 🔍 THE LAST LOOK (Fetch name before destruction)
+        const member = await prisma.member.findUnique({
+            where: { id },
+            select: { name: true }
+        });
+
+        if (!member) return { error: "Member not found." };
+
+        // 2. 🧨 THE DESTRUCTION (Atomic Transaction)
         await prisma.$transaction([
             prisma.attendance.deleteMany({ where: { memberId: id } }),
             prisma.transaction.deleteMany({ where: { memberId: id } }),
             prisma.member.delete({ where: { id } }),
         ]);
 
+        // 3. 📜 THE AUDIT LOG (Information Assurance)
+        await createAuditEntry(
+            "MEMBER_DELETE",
+            `ADMIN ACTION: Permanently wiped member "${member.name}" and all history.`,
+            id
+        );
+
         revalidatePath("/");
-        revalidatePath("/reports/retention"); // 🏛️ NEW: Sync BI Reports
+        revalidatePath("/reports/retention");
+
     } catch (error) {
         console.error("DELETE_ERROR:", error);
         return { error: "Failed to delete member data." };
@@ -219,11 +362,9 @@ export async function deleteMember(id: string) {
     redirect("/");
 }
 
-/**
- * ---------------------------------------------------------------------------
- * SECTION 3: SYSTEM SETTINGS
- * ---------------------------------------------------------------------------
- */
+// ---------------------------------------------------------------------------
+// SECTION 3: SYSTEM SETTINGS
+// ---------------------------------------------------------------------------
 
 export async function updateRevenueGoal(newGoal: number) {
     try {
@@ -232,6 +373,13 @@ export async function updateRevenueGoal(newGoal: number) {
             update: { revenueGoal: newGoal },
             create: { id: "settings", revenueGoal: newGoal },
         });
+
+        // 🏛️ AUDIT TRAIL: Record target modification
+        await createAuditEntry(
+            "SETTINGS_UPDATE",
+            `Modified system revenue target to ₱${newGoal.toLocaleString()}`,
+            "settings"
+        );
 
         revalidatePath("/");
         return { success: true };

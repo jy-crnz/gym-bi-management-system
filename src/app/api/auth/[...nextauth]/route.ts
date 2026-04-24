@@ -15,19 +15,14 @@ const handler = NextAuth({
                 flow: { label: "Flow", type: "text" }
             },
             async authorize(credentials) {
-                // ── SECTION 1: RATE LIMITING (Defense in Depth) ──
+                // ── SECTION 1: RATE LIMITING ──
                 const headerList = await headers();
                 const ip = headerList.get("x-forwarded-for") || "127.0.0.1";
 
-                // We use a specific prefix to keep Admin and Member lockouts separate in Redis
                 const limitKey = `auth_${credentials?.flow || 'admin'}_${ip}`;
                 const { success } = await loginRateLimiter.limit(limitKey);
 
                 if (!success) {
-                    /**
-                     * KINDNESS: Throwing an Error here sends the specific message 
-                     * back to your LoginForm's res.error.
-                     */
                     throw new Error("Too many attempts. Access locked for 60s.");
                 }
 
@@ -35,7 +30,14 @@ const handler = NextAuth({
                 if (credentials?.flow === "member") {
                     const member = await prisma.member.findUnique({
                         where: { email: credentials.email },
-                        select: { id: true, name: true, email: true, tier: true }
+                        // 🏛️ FIX: Replaced 'tier' with 'passType' and 'activeUntil'
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            passType: true,
+                            activeUntil: true
+                        }
                     });
 
                     if (!member) return null;
@@ -45,7 +47,8 @@ const handler = NextAuth({
                         email: member.email,
                         name: member.name,
                         role: "MEMBER",
-                        tier: member.tier
+                        passType: member.passType, // 🏛️ UPDATED
+                        activeUntil: member.activeUntil, // 🏛️ NEW
                     };
                 }
 
@@ -53,7 +56,7 @@ const handler = NextAuth({
                 const adminUser = {
                     id: "admin-01",
                     email: "admin@tup.edu.ph",
-                    password: "password123", // Architecture Note: Move to .env for production!
+                    password: "password123",
                     name: "Jay Lawrence (Admin)",
                     role: "ADMIN"
                 };
@@ -78,7 +81,9 @@ const handler = NextAuth({
             if (user) {
                 token.id = user.id;
                 token.role = (user as any).role;
-                token.tier = (user as any).tier;
+                // 🏛️ UPDATED: Store new pass dimension in the JWT
+                token.passType = (user as any).passType;
+                token.activeUntil = (user as any).activeUntil;
             }
             return token;
         },
@@ -86,7 +91,9 @@ const handler = NextAuth({
             if (session.user) {
                 (session.user as any).id = token.id;
                 (session.user as any).role = token.role;
-                (session.user as any).tier = token.tier;
+                // 🏛️ UPDATED: Expose to the Frontend (useSession)
+                (session.user as any).passType = token.passType;
+                (session.user as any).activeUntil = token.activeUntil;
             }
             return session;
         }

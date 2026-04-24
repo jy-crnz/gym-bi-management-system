@@ -5,23 +5,35 @@ import pg from "pg";
 
 /**
  * ARCHITECTURE IS KINDNESS:
- * We use a connection pool to manage database traffic efficiently.
- * In Prisma 7, we pass this through the adapter.
+ * We use a connection pool (pg.Pool) to manage database traffic efficiently.
+ * This ensures the Next.js app securely talks to the Supabase Pooler (Port 6543)
+ * without exhausting database connections.
  */
 const pool = new pg.Pool({
     connectionString: process.env.DATABASE_URL
 });
+
 const adapter = new PrismaPg(pool);
+
+// 🏛️ The modern Next.js Singleton pattern
+const prismaClientSingleton = () => {
+    return new PrismaClient({
+        adapter,
+        // Optional: Keep "query" active while you are testing the new Cohort Matrix 
+        // to see the exact SQL Prisma is writing under the hood.
+        log: ["error", "warn"],
+    });
+};
+
+declare global {
+    // eslint-disable-next-line no-var
+    var prisma: undefined | ReturnType<typeof prismaClientSingleton>;
+}
 
 // This ensures we only ever have one instance of Prisma running in development
 // to prevent "Too many clients" errors in Supabase.
-const globalForPrisma = global as unknown as { prisma: PrismaClient };
+export const prisma = globalThis.prisma ?? prismaClientSingleton();
 
-export const prisma =
-    globalForPrisma.prisma ||
-    new PrismaClient({
-        adapter,
-        log: ["query"], // Helpful for debugging your BI queries
-    });
-
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+if (process.env.NODE_ENV !== "production") {
+    globalThis.prisma = prisma;
+}

@@ -4,7 +4,6 @@ import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Html5Qrcode } from "html5-qrcode";
 import { logAttendance } from "../actions";
-// 🏛️ Added User icon for the identity card UI
 import { Camera, X, CheckCircle2, ScanLine, Laptop, Lock, Scan, CameraOff, ImageUp, ChevronDown, User } from "lucide-react";
 
 type ScanState = "idle" | "starting" | "scanning" | "success" | "error";
@@ -17,7 +16,7 @@ export function QRScanner() {
     const [selectedCamera, setSelectedCamera] = useState<string>("");
     const [imageError, setImageError] = useState<string | null>(null);
 
-    // 🏛️ NEW FEATURE: Store the identity of the person just scanned
+    // 🏛️ IDENTITY TRACKING
     const [scannedMember, setScannedMember] = useState<{ name: string } | null>(null);
 
     const scannerRef = useRef<Html5Qrcode | null>(null);
@@ -64,22 +63,31 @@ export function QRScanner() {
                 async (decodedText) => {
                     if (cancelled) return;
 
-                    // Stop scanning immediately on detection
                     isRunningRef.current = false;
                     await scannerRef.current?.stop().catch(() => { });
 
                     try {
-                        // 🏛️ CAPTURE IDENTITY: Log attendance and get the name back
+                        // 🏛️ THE HANDSHAKE
                         const result = await logAttendance(decodedText);
+
+                        // 🏛️ ERROR GATE: Check if the bouncer blocked them
+                        if (result.error) {
+                            setScanState("error");
+                            setImageError(result.error);
+                            // Auto-close after error so they can try again or see the dashboard
+                            setTimeout(() => handleClose(), 4000);
+                            return;
+                        }
+
                         if (result?.name) {
                             setScannedMember({ name: result.name });
                         }
                         setScanState("success");
                     } catch {
                         setScanState("error");
+                        setImageError("Security Handshake Failed.");
                     }
 
-                    // 🏛️ INCREASED TIMEOUT: Give staff 3.5s to read the member's name
                     setTimeout(() => handleClose(), 3500);
                 },
                 () => { }
@@ -105,7 +113,7 @@ export function QRScanner() {
         setCameras([]);
         setSelectedCamera("");
         setImageError(null);
-        setScannedMember(null); // 🏛️ Reset identity on close
+        setScannedMember(null);
     };
 
     const handleCameraChange = async (newId: string) => {
@@ -123,8 +131,15 @@ export function QRScanner() {
             const result = await fileScanner.scanFile(file, false);
             await safeStop();
 
-            // 🏛️ FILE UPLOAD IDENTITY: Also retrieve name for file scans
+            // 🏛️ FILE UPLOAD HANDSHAKE
             const attendanceResult = await logAttendance(result);
+
+            if (attendanceResult.error) {
+                setScanState("error");
+                setImageError(attendanceResult.error);
+                return;
+            }
+
             if (attendanceResult?.name) {
                 setScannedMember({ name: attendanceResult.name });
             }
@@ -132,7 +147,8 @@ export function QRScanner() {
             setScanState("success");
             setTimeout(() => handleClose(), 3500);
         } catch {
-            setImageError("No QR code found in this image.");
+            setImageError("Invalid QR code or access denied.");
+            setScanState("error");
         } finally {
             fileScanner.clear();
             if (fileInputRef.current) fileInputRef.current.value = "";
@@ -178,17 +194,22 @@ export function QRScanner() {
                             </div>
                         )}
 
-                        {/* Error State */}
+                        {/* Error/Denied State Overlay */}
                         {scanState === "error" && (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 z-10 pointer-events-none">
-                                <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center">
-                                    <CameraOff className="w-5 h-5 text-red-400" />
+                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-red-950/90 z-30 animate-in zoom-in-95 duration-200">
+                                <div className="w-16 h-16 rounded-full bg-red-500/20 border border-red-500 flex items-center justify-center">
+                                    <CameraOff className="w-8 h-8 text-red-500" />
                                 </div>
-                                <span className="text-xs text-red-400">Camera unavailable</span>
+                                <div className="text-center px-4">
+                                    <p className="text-[10px] font-black text-red-500 uppercase tracking-[0.2em] mb-1">Access Denied</p>
+                                    <p className="text-sm font-bold text-white leading-tight">
+                                        {imageError || "Verification Failed"}
+                                    </p>
+                                </div>
                             </div>
                         )}
 
-                        {/* 🏛️ IMPROVED SUCCESS UI: Show scanned identity */}
+                        {/* Success State Overlay */}
                         {scanState === "success" && (
                             <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-zinc-950/95 z-30 animate-in zoom-in-95 duration-300">
                                 <div className="relative">
@@ -251,13 +272,6 @@ export function QRScanner() {
                         )}
                     </div>
 
-                    {imageError && (
-                        <p className="text-xs text-red-400 text-center -mt-1">{imageError}</p>
-                    )}
-
-                    <div id="qr-file-scanner" className="hidden" />
-                    <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
-
                     {/* Footer System Status */}
                     <div className="flex items-center justify-center gap-3 pt-3 border-t border-zinc-800">
                         <div className="flex items-center gap-1.5 text-zinc-500">
@@ -307,7 +321,6 @@ export function QRScanner() {
                 Scan pass
             </button>
 
-            {/* 🏛️ TELEPORT THE MODAL: Bypasses parent CSS constraints */}
             {mounted && isOpen && createPortal(modalContent, document.body)}
         </div>
     );

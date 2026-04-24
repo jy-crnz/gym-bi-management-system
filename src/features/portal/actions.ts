@@ -5,66 +5,78 @@ import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
 import { loginRateLimiter } from "@/lib/ratelimit";
 
-/**
- * ARCHITECTURE IS KINDNESS: Discriminated Union
- * Satisfies the PortalLoginForm handshake and ensures type safety 
- * for the client-side router.
- */
 export type LoginResult =
     | { error: string; memberId?: never }
     | { memberId: string; error?: never };
 
-/**
- * loginAsMember
- * BI GOAL: Securely verify student identity and grant portal access.
- * SECURITY: Implements IP-based rate limiting to prevent brute-force attacks.
- */
 export async function loginAsMember(formData: FormData): Promise<LoginResult> {
     const email = formData.get("email") as string;
 
-    // 1. Basic Validation
     if (!email) {
         return { error: "Email is required to access the portal." };
     }
 
     try {
-        /**
-         * SECTION 1: RATE LIMITING (Defense in Depth)
-         * We retrieve the student's IP to ensure a single actor isn't
-         * hammering the system with multiple login attempts.
-         */
+        // ── SECTION 1: RATE LIMITING ──
         const headerList = await headers();
         const ip = headerList.get("x-forwarded-for") || "127.0.0.1";
-
-        const { success } = await loginRateLimiter.limit(ip);
+        const { success } = await loginRateLimiter.limit(`portal_login_${ip}`);
 
         if (!success) {
             return { error: "Too many attempts. Please wait 60 seconds." };
         }
 
-        /**
-         * SECTION 2: THE HANDSHAKE
-         * Querying the database to verify membership existence.
-         */
+        // ── SECTION 2: THE HANDSHAKE ──
         const member = await prisma.member.findUnique({
             where: { email },
-            select: { id: true }
+            select: {
+                id: true,
+                status: true,
+                activeUntil: true
+            }
         });
 
         if (!member) {
-            /**
-             * SECURITY NOTE: We use a generic error message here to prevent 
-             * 'Email Enumeration'—disclosing which emails are in our database.
-             */
             return { error: "Invalid credentials or unauthorized access." };
         }
 
-        // Return the ID to facilitate dynamic routing to /portal/[id]
+        /**
+         * 🏛️ THE TEMPORAL GATEKEEPER
+         * We verify if the current time has surpassed the activeUntil timestamp.
+         */
+        const now = new Date();
+        const expiryDate = member.activeUntil ? new Date(member.activeUntil) : null;
+
+        // If no date exists or date is in the past, they are expired
+        const isExpired = expiryDate ? expiryDate < now : true;
+
+        if (member.status !== "ACTIVE" || isExpired) {
+            return {
+                error: "Your membership has expired or is inactive. Please proceed to the front desk for renewal."
+            };
+        }
+
+        // SUCCESS: Only return ID if they pass the status AND time checks
         return { memberId: member.id };
 
     } catch (error) {
-        // Information Assurance: Log the error internally, keep the UI vague.
         console.error("PORTAL_AUTH_ERROR:", error);
         return { error: "A system error occurred. Please try again later." };
+    }
+}
+
+export async function getPortalData(memberId: string) {
+    try {
+        const data = await prisma.member.findUnique({
+            where: { id: memberId },
+            include: {
+                attendance: { orderBy: { checkIn: "desc" }, take: 10 },
+                transactions: { orderBy: { createdAt: "desc" }, take: 10 },
+            },
+        });
+        return JSON.parse(JSON.stringify(data));
+    } catch (error) {
+        console.error("GET_PORTAL_DATA_ERROR:", error);
+        return null;
     }
 }

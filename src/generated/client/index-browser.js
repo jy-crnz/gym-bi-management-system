@@ -125,9 +125,10 @@ exports.Prisma.MemberScalarFieldEnum = {
   name: 'name',
   email: 'email',
   status: 'status',
+  passType: 'passType',
+  activeUntil: 'activeUntil',
   churnRiskScore: 'churnRiskScore',
   totalSpent: 'totalSpent',
-  tier: 'tier',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -155,6 +156,15 @@ exports.Prisma.SystemSettingsScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.AuditLogScalarFieldEnum = {
+  id: 'id',
+  action: 'action',
+  entityId: 'entityId',
+  details: 'details',
+  adminName: 'adminName',
+  createdAt: 'createdAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -175,17 +185,17 @@ exports.MemberStatus = exports.$Enums.MemberStatus = {
   CANCELLED: 'CANCELLED'
 };
 
-exports.MembershipTier = exports.$Enums.MembershipTier = {
-  BASIC: 'BASIC',
-  PREMIUM: 'PREMIUM',
-  VIP: 'VIP'
+exports.PassType = exports.$Enums.PassType = {
+  DAY_PASS: 'DAY_PASS',
+  MONTHLY: 'MONTHLY'
 };
 
 exports.Prisma.ModelName = {
   Member: 'Member',
   Attendance: 'Attendance',
   Transaction: 'Transaction',
-  SystemSettings: 'SystemSettings'
+  SystemSettings: 'SystemSettings',
+  AuditLog: 'AuditLog'
 };
 
 /**

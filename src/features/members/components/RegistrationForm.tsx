@@ -12,7 +12,7 @@ export function RegistrationForm() {
 
     /**
      * ARCHITECTURE TIP: 
-     * Providing explicit defaultValues for 'tier' ensures your BI 
+     * Providing explicit defaultValues for 'passType' ensures your BI 
      * data starts with a valid segment and avoids "undefined" errors.
      */
     const {
@@ -26,14 +26,14 @@ export function RegistrationForm() {
             name: "",
             email: "",
             status: "ACTIVE",
-            tier: "BASIC" // NEW: Default segment for new signups
+            passType: "DAY_PASS" // 🏛️ NEW: Default to Day Pass for walk-ins
         },
     });
 
     /**
      * ENGINEERING STANDARD:
-     * The onSubmit function now passes the 'tier' to the Server Action,
-     * which drives the Donut Chart distribution.
+     * The onSubmit function now passes the 'passType' to the Server Action,
+     * which automatically calculates the 'activeUntil' expiration date.
      */
     const onSubmit: SubmitHandler<MemberInput> = async (data) => {
         setServerError(null);
@@ -97,26 +97,25 @@ export function RegistrationForm() {
                     )}
                 </div>
 
-                {/* NEW: Membership Tier Field (BI Segment) */}
+                {/* NEW: Pass Type Selection (₱30 / ₱450 Model) */}
                 <div>
                     <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1.5">
-                        Membership Tier
+                        Access Pass Type
                     </label>
                     <select
-                        {...register("tier")}
+                        {...register("passType")}
                         /* 🏛️ FIX: Locked inputs to bg-zinc-800 / border-zinc-700 */
                         className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all text-white text-sm appearance-none cursor-pointer"
                         disabled={isSubmitting}
                     >
-                        <option value="BASIC">Basic (₱1,000/mo)</option>
-                        <option value="PREMIUM">Premium (₱2,500/mo)</option>
-                        <option value="VIP">VIP Elite (₱5,000/mo)</option>
+                        <option value="DAY_PASS">Day Pass (₱30)</option>
+                        <option value="MONTHLY">Monthly Member (₱450)</option>
                     </select>
                     <p className="text-[9px] text-zinc-400 mt-1 italic">
-                        *This selection updates the Tier Distribution chart.
+                        *Day Pass expires at midnight; Monthly expires in 30 days.
                     </p>
-                    {errors.tier && (
-                        <p className="text-red-500 text-[10px] font-bold mt-1 uppercase italic">{errors.tier.message}</p>
+                    {errors.passType && (
+                        <p className="text-red-500 text-[10px] font-bold mt-1 uppercase italic">{errors.passType.message}</p>
                     )}
                 </div>
 

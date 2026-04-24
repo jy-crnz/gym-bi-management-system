@@ -9,9 +9,9 @@ export const MemberSchema = z.object({
     email: z.string().email("Invalid email address"),
     status: z.enum(["ACTIVE", "INACTIVE", "CANCELLED"]),
 
-    // NEW: Categorization field for BI Segmentation.
-    // We omit .default() here to allow useForm to handle the initial state explicitly.
-    tier: z.enum(["BASIC", "PREMIUM", "VIP"]),
+    // 🏛️ NEW: Bakal Gym Business Model Alignment
+    // Replaced the old 'tier' system with strict 'passType' categorization.
+    passType: z.enum(["DAY_PASS", "MONTHLY"]),
 });
 
 /**
@@ -26,12 +26,13 @@ export const CheckInSchema = z.object({
 /**
  * BI GOAL: Financial Analytics (Revenue).
  * Coerces the input to a number to prevent "String vs Number" math errors 
- * when calculating total revenue on the dashboard.
+ * and strictly forces the payment to be either a Day Pass or a Monthly renewal.
  */
 export const TransactionSchema = z.object({
     memberId: z.string().min(1, "Member ID is required"),
     amount: z.coerce.number().positive("Amount must be greater than 0"),
-    type: z.enum(["MEMBERSHIP", "SUPPLEMENT", "OTHER"]),
+    // 🏛️ NEW: Replaced generic "MEMBERSHIP" with exact business offerings
+    passType: z.enum(["DAY_PASS", "MONTHLY"]),
 });
 
 // TYPE INFERENCE: Keeps your components in sync with your validation logic.

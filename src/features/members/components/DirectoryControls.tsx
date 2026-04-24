@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { Search, ChevronLeft, ChevronRight, Filter } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { useState, useEffect } from "react";
 
 export function DirectoryControls({ totalPages, currentPage }: { totalPages: number, currentPage: number }) {
@@ -22,6 +22,7 @@ export function DirectoryControls({ totalPages, currentPage }: { totalPages: num
 
     const handleUpdateUrl = (key: string, value: string | number) => {
         const params = new URLSearchParams(searchParams.toString());
+
         if (value && value !== "ALL") {
             params.set(key, String(value));
         } else {
@@ -50,10 +51,11 @@ export function DirectoryControls({ totalPages, currentPage }: { totalPages: num
                     />
                 </div>
 
+                {/* Status Filter */}
                 <select
                     onChange={(e) => handleUpdateUrl("status", e.target.value)}
                     defaultValue={searchParams.get("status") || "ALL"}
-                    className="px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs font-medium text-zinc-400 outline-none focus:border-emerald-500 cursor-pointer"
+                    className="px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs font-black uppercase tracking-widest text-zinc-400 outline-none focus:border-emerald-500 cursor-pointer"
                 >
                     <option value="ALL">All Status</option>
                     <option value="ACTIVE">Active</option>
@@ -61,15 +63,15 @@ export function DirectoryControls({ totalPages, currentPage }: { totalPages: num
                     <option value="CANCELLED">Cancelled</option>
                 </select>
 
+                {/* 🏛️ FIXED: Pass Type Filter (Replaced Tier) */}
                 <select
-                    onChange={(e) => handleUpdateUrl("tier", e.target.value)}
-                    defaultValue={searchParams.get("tier") || "ALL"}
-                    className="px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs font-medium text-zinc-400 outline-none focus:border-emerald-500 cursor-pointer"
+                    onChange={(e) => handleUpdateUrl("passType", e.target.value)}
+                    defaultValue={searchParams.get("passType") || "ALL"}
+                    className="px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs font-black uppercase tracking-widest text-zinc-400 outline-none focus:border-emerald-500 cursor-pointer"
                 >
-                    <option value="ALL">All Tiers</option>
-                    <option value="BASIC">Basic</option>
-                    <option value="PREMIUM">Premium</option>
-                    <option value="VIP">VIP</option>
+                    <option value="ALL">All Passes</option>
+                    <option value="DAY_PASS">Day Pass (₱30)</option>
+                    <option value="MONTHLY">Monthly (₱450)</option>
                 </select>
             </div>
 

@@ -15,40 +15,55 @@ interface ExportData {
     tiers: { name: string; value: number }[];
 }
 
-export function ExportReportButton({ data }: { data: ExportData }) {
+// 🏛️ Added 'range' prop to help the PDF label its data correctly
+export function ExportReportButton({ 
+    data, 
+    range = "30d" 
+}: { 
+    data: ExportData; 
+    range?: string 
+}) {
     const [isGenerating, setIsGenerating] = useState(false);
 
     const generatePDF = () => {
         setIsGenerating(true);
         const doc = new jsPDF();
         const timestamp = new Date().toLocaleString();
+        
+        // 🏛️ BI CALCULATIONS: Derive ARPU for the report
+        const arpu = data.stats.activeMembers > 0 
+            ? (data.stats.totalRevenue / data.stats.activeMembers) 
+            : 0;
 
         // 1. HEADER SECTION
         doc.setFontSize(20);
-        doc.setTextColor(24, 24, 27); // Zinc-900
+        doc.setTextColor(24, 24, 27);
         doc.text("GYM BI SYSTEM - MONTHLY REPORT", 14, 22);
 
         doc.setFontSize(10);
-        doc.setTextColor(113, 113, 122); // Zinc-500
+        doc.setTextColor(113, 113, 122);
         doc.text(`Generated on: ${timestamp}`, 14, 30);
-        doc.text("TUP Manila • BSIT - 3A • Analytics Department", 14, 35);
+        doc.text(`Reporting Period: ${range === 'all' ? 'All Time' : `Last ${range}`}`, 14, 35);
+        doc.text("TUP Manila • BSIT - 3A • Analytics Department", 14, 40);
 
         // 2. EXECUTIVE SUMMARY TABLE
         doc.setFontSize(14);
         doc.setTextColor(24, 24, 27);
-        doc.text("Executive Summary", 14, 50);
+        doc.text("Executive Summary", 14, 55);
 
         autoTable(doc, {
-            startY: 55,
+            startY: 60,
             head: [['Metric', 'Value']],
             body: [
                 ['Total Registered Members', data.stats.totalMembers.toString()],
-                ['Active Members', data.stats.activeMembers.toString()],
+                ['Active Members (Non-Expired)', data.stats.activeMembers.toString()],
                 ['Today\'s Foot Traffic', data.stats.todayAttendance.toString()],
-                ['Total Lifetime Revenue', `PHP ${data.stats.totalRevenue.toLocaleString()}`],
+                // 🏛️ DYNAMIC LABEL: Avoids "Lifetime" if range is set
+                [range === 'all' ? 'Total Lifetime Revenue' : `Total Revenue (${range})`, `PHP ${data.stats.totalRevenue.toLocaleString()}`],
+                // 🏛️ NEW METRIC: Adds ARPU to the PDF
+                ['Average Revenue Per User (ARPU)', `PHP ${Math.round(arpu).toLocaleString()}`],
             ],
             theme: 'striped',
-            // FIX: Removed 'fillStyle' and kept only 'fillColor'
             headStyles: { fillColor: [24, 24, 27] },
         });
 
@@ -60,18 +75,18 @@ export function ExportReportButton({ data }: { data: ExportData }) {
 
         autoTable(doc, {
             startY: finalY + 20,
-            head: [['Tier Name', 'Member Count', 'Percentage']],
+            // 🏛️ UI UPDATE: Renamed 'Tier Name' to 'Pass Type'
+            head: [['Pass Type', 'Member Count', 'Percentage']],
             body: data.tiers.map(t => [
-                t.name,
+                t.name === "DAY_PASS" ? "Day Pass" : "Monthly", // 🏛️ Clean Labels
                 t.value.toString(),
                 `${((t.value / (data.stats.totalMembers || 1)) * 100).toFixed(1)}%`
             ]),
             theme: 'grid',
-            headStyles: { fillColor: [59, 130, 246] }, // Blue-500
+            headStyles: { fillColor: [59, 130, 246] }, 
         });
 
         // 4. FOOTER & PAGE NUMBERING
-        // FIX: Use the public getNumberOfPages() method directly on 'doc'
         const pageCount = doc.getNumberOfPages();
         for (let i = 1; i <= pageCount; i++) {
             doc.setPage(i);
@@ -85,7 +100,6 @@ export function ExportReportButton({ data }: { data: ExportData }) {
             );
         }
 
-        // SAVE THE FILE
         doc.save(`Gym-Report-${new Date().toISOString().split('T')[0]}.pdf`);
         setIsGenerating(false);
     };
@@ -94,7 +108,6 @@ export function ExportReportButton({ data }: { data: ExportData }) {
         <button
             onClick={generatePDF}
             disabled={isGenerating}
-            /* 🏛️ FIX: Stripped light mode classes. Locked permanently to bg-zinc-900 / border-zinc-800 */
             className="flex items-center gap-2 px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-xs font-bold uppercase tracking-widest text-zinc-400 hover:bg-zinc-800 transition-all active:scale-95 shadow-sm disabled:opacity-50"
         >
             {isGenerating ? (

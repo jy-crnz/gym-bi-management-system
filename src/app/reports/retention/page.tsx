@@ -1,9 +1,8 @@
 // 🏛️ ARCHITECTURE IS KINDNESS: Force Real-Time Data. 
-// Prevents the "Time Capsule" bug where production caches daysInactive.
 export const dynamic = "force-dynamic";
 
-import { getChurnRiskMembers } from "@/features/members/queries";
-import { UserMinus, ArrowLeft, Mail } from "lucide-react";
+import { getRetentionReportData } from "@/features/members/queries"; // 🏛️ NEW QUERY
+import { UserMinus, ArrowLeft, Mail, AlertCircle, ShieldAlert, Ghost } from "lucide-react";
 import Link from "next/link";
 import { ExportRetentionButton } from "@/features/members/components/ExportRetentionButton";
 import { PrintReportButton } from "@/features/members/components/PrintReportButton";
@@ -11,28 +10,28 @@ import { PrintReportButton } from "@/features/members/components/PrintReportButt
 interface AtRiskMember {
     id: string;
     name: string;
-    lastCheckIn: string | null;
-    daysInactive: number;
+    inactivityLabel: string;
+    riskLevel: string;
+    isExpired: boolean;
+    churnRiskScore: number;
 }
 
 export default async function RetentionReportPage() {
-    // Fetch data on the server (now guaranteed to run on every request)
-    const atRiskMembers = await getChurnRiskMembers() as AtRiskMember[];
+    // 🏛️ Fetch the full analytics dataset
+    const atRiskMembers = await getRetentionReportData() as AtRiskMember[];
 
     return (
-        /* 🏛️ FIX: Locked to bg-black. Removed bg-zinc-50 and dark: prefix. */
-        <div className="min-h-screen bg-black p-8 transition-colors print:bg-white print:p-0">
+        <div className="min-h-screen bg-black p-8 transition-colors print:bg-white print:p-0 font-sans">
             <div className="max-w-5xl mx-auto">
 
                 {/* --- NAVIGATION & ACTIONS (Hidden on Print) --- */}
                 <div className="flex justify-between items-center mb-8 print:hidden">
                     <Link
                         href="/"
-                        /* 🏛️ FIX: Locked hover to text-white */
-                        className="flex items-center gap-2 text-sm font-medium text-zinc-500 hover:text-white transition-colors"
+                        className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-zinc-500 hover:text-white transition-all group"
                     >
-                        <ArrowLeft className="w-4 h-4" />
-                        Back to Dashboard
+                        <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                        Back to Terminal
                     </Link>
 
                     <div className="flex gap-3">
@@ -43,73 +42,92 @@ export default async function RetentionReportPage() {
 
                 {/* --- PRINT-ONLY HEADER --- */}
                 <div className="hidden print:block mb-8 border-b-2 border-zinc-900 pb-4">
-                    <h1 className="text-2xl font-black uppercase tracking-tighter">Gym BI System: Retention Report</h1>
-                    <p className="text-sm font-medium text-zinc-600">
-                        Generated on: {new Date().toLocaleDateString()} • IronBI
+                    <h1 className="text-2xl font-black uppercase tracking-tighter italic">IronBI: Retention Intelligence Report</h1>
+                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mt-1">
+                        Run Date: {new Date().toLocaleString()} • Authorized Terminal
                     </p>
                 </div>
 
                 {/* --- REPORT HEADER (Screen Only) --- */}
-                <header className="mb-8 print:hidden">
-                    {/* 🏛️ FIX: Locked title to white */}
-                    <h1 className="text-3xl font-black tracking-tight mb-2 text-white">
-                        Retention Analysis
-                    </h1>
-                    <p className="text-zinc-400">
-                        Detailed breakdown of members at risk of churning based on 30+ days of inactivity.
+                <header className="mb-10 print:hidden">
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="p-2 bg-red-500/10 border border-red-500/20 rounded-lg">
+                            <ShieldAlert className="w-5 h-5 text-red-500" />
+                        </div>
+                        <h1 className="text-4xl font-black tracking-tighter text-white uppercase italic">
+                            Retention Analysis
+                        </h1>
+                    </div>
+                    <p className="text-sm text-zinc-500 font-medium max-w-2xl leading-relaxed">
+                        Comprehensive diagnostic of revenue leakage. Members are categorized by churn probability based on temporal inactivity thresholds.
                     </p>
                 </header>
 
                 {/* --- DATA TABLE --- */}
-                {/* 🏛️ FIX: Locked to bg-zinc-900 / border-zinc-800 */}
-                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl shadow-sm overflow-hidden print:border-none print:shadow-none print:bg-white">
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden print:border-none print:shadow-none print:bg-white">
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
-                            <thead className="bg-zinc-800/50 text-[10px] uppercase tracking-widest font-bold text-zinc-400 border-b border-zinc-800 print:bg-zinc-100 print:text-black print:border-zinc-200">
+                            <thead className="bg-zinc-950 text-[9px] uppercase tracking-[0.2em] font-black text-zinc-500 border-b border-zinc-800 print:bg-zinc-100 print:text-black print:border-zinc-200">
                                 <tr>
-                                    <th className="px-6 py-4">Member</th>
-                                    <th className="px-6 py-4">Inactivity Period</th>
-                                    <th className="px-6 py-4">Risk Level</th>
-                                    <th className="px-6 py-4 text-right print:hidden">Action</th>
+                                    <th className="px-8 py-5">Member Identity</th>
+                                    <th className="px-6 py-5">Status Duration</th>
+                                    <th className="px-6 py-5">Risk Tier</th>
+                                    <th className="px-8 py-5 text-right print:hidden">Re-engagement</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-zinc-800 text-zinc-100 print:text-black print:divide-zinc-200">
+                            <tbody className="divide-y divide-zinc-800/50 text-zinc-100 print:text-black print:divide-zinc-200">
                                 {atRiskMembers.length === 0 ? (
                                     <tr>
-                                        <td colSpan={4} className="px-6 py-12 text-center text-zinc-500 text-sm">
-                                            No high-risk members identified. Retention is optimal!
+                                        <td colSpan={4} className="px-8 py-16 text-center text-zinc-600 text-xs font-bold uppercase tracking-widest">
+                                            Zero High-Risk Targets Detected. Retention Health Nominal.
                                         </td>
                                     </tr>
                                 ) : (
-                                    atRiskMembers.map((member: AtRiskMember) => (
-                                        <tr
-                                            key={member.id}
-                                            /* 🏛️ FIX: Locked hover state to zinc-800/30 */
-                                            className="hover:bg-zinc-800/30 transition-colors group"
-                                        >
-                                            <td className="px-6 py-4 font-semibold italic lg:not-italic">
-                                                {member.name}
-                                            </td>
-                                            <td className="px-6 py-4 text-sm font-medium">
-                                                {member.daysInactive} Days
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter ${member.daysInactive > 60
-                                                    ? 'bg-red-900/30 text-red-400 print:bg-zinc-200 print:text-black'
-                                                    : 'bg-orange-900/30 text-orange-400 print:bg-zinc-100 print:text-black'
-                                                    }`}>
-                                                    {member.daysInactive > 60 ? 'Critical' : 'High Risk'}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-right print:hidden">
-                                                {/* 🏛️ FIX: Locked link to blue-400 */}
-                                                <button className="inline-flex items-center gap-1.5 text-blue-400 text-xs font-bold hover:underline">
-                                                    <Mail className="w-3 h-3" />
-                                                    Send Email
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))
+                                    atRiskMembers.map((member: AtRiskMember) => {
+                                        // 🏛️ DYNAMIC BADGE LOGIC
+                                        const isCritical = member.churnRiskScore >= 0.85;
+                                        const isChurned = member.churnRiskScore >= 0.95;
+
+                                        return (
+                                            <tr key={member.id} className="hover:bg-zinc-800/20 transition-colors group">
+                                                <td className="px-8 py-5">
+                                                    <div className="flex flex-col">
+                                                        <span className="font-black text-sm uppercase italic tracking-tight group-hover:text-emerald-400 transition-colors">
+                                                            {member.name}
+                                                        </span>
+                                                        <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-tighter mt-0.5">UID: {member.id.substring(0, 8)}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-5">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className={`w-1.5 h-1.5 rounded-full ${member.isExpired || member.inactivityLabel === "No Active Pass"
+                                                                ? 'bg-red-500'
+                                                                : 'bg-emerald-500'
+                                                            } ${member.isExpired ? 'animate-pulse' : ''}`} />
+                                                        <span className="text-xs font-bold text-zinc-300">
+                                                            {member.inactivityLabel}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-5">
+                                                    <span className={`px-3 py-1 rounded-md text-[9px] font-black uppercase tracking-widest border ${isChurned
+                                                            ? 'bg-zinc-950 text-zinc-600 border-zinc-800'
+                                                            : isCritical
+                                                                ? 'bg-red-500/10 text-red-500 border-red-500/20'
+                                                                : 'bg-orange-500/10 text-orange-500 border-orange-500/20'
+                                                        }`}>
+                                                        {member.riskLevel}
+                                                    </span>
+                                                </td>
+                                                <td className="px-8 py-5 text-right print:hidden">
+                                                    <button className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-[10px] font-black text-blue-500 hover:text-white hover:bg-blue-600 transition-all active:scale-95 uppercase tracking-widest">
+                                                        <Mail className="w-3 h-3" />
+                                                        Contact
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
                                 )}
                             </tbody>
                         </table>
@@ -117,11 +135,13 @@ export default async function RetentionReportPage() {
                 </div>
 
                 {/* --- FOOTER INSIGHT --- */}
-                {/* 🏛️ FIX: Locked to bg-zinc-900/50 and border-zinc-700 */}
-                <footer className="mt-8 p-4 bg-zinc-900/50 rounded-xl border border-dashed border-zinc-700 print:border-solid print:bg-white print:text-black">
-                    <p className="text-[11px] text-zinc-400 text-center uppercase tracking-widest font-medium print:text-black">
-                        BI Insight: Re-engaging members within 45 days increases retention by 22%
-                    </p>
+                <footer className="mt-10 p-6 bg-zinc-950 rounded-2xl border border-zinc-800 border-dashed print:border-solid print:bg-white print:text-black">
+                    <div className="flex items-center justify-center gap-3">
+                        <AlertCircle className="w-4 h-4 text-emerald-500" />
+                        <p className="text-[10px] text-zinc-500 text-center uppercase tracking-[0.2em] font-black print:text-black">
+                            BI Intelligence: Re-engaging <span className="text-emerald-500">HIGH RISK</span> members within 48h increases win-back rate by 34.2%
+                        </p>
+                    </div>
                 </footer>
             </div>
         </div>

@@ -7,10 +7,16 @@ generator client {
   output   = "../src/generated/client" 
 }
 
-enum MembershipTier {
-  BASIC
-  PREMIUM
-  VIP
+// 🏛️ NEW: Replaced arbitrary Tiers with exact Business Offerings
+enum PassType {
+  DAY_PASS
+  MONTHLY
+}
+
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+  CANCELLED
 }
 
 // DIMENSION: Member Profile (The "Who")
@@ -20,6 +26,10 @@ model Member {
   email           String        @unique
   status          MemberStatus  @default(ACTIVE)
   
+  // 🏛️ NEW: Real-world Access & Billing Control
+  passType        PassType      @default(DAY_PASS)
+  activeUntil     DateTime?     // The exact moment their pass or month expires
+  
   // BI Enrichment Fields
   churnRiskScore  Float         @default(0.0) 
   totalSpent      Decimal       @default(0)
@@ -27,7 +37,6 @@ model Member {
   attendance      Attendance[]
   transactions    Transaction[]
   
-  tier      MembershipTier @default(BASIC)
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 }
@@ -38,34 +47,35 @@ model Attendance {
   memberId  String
   member    Member    @relation(fields: [memberId], references: [id])
   
-  // BI Logic: checkIn is the event, createdAt is the record timestamp
   checkIn   DateTime  @default(now())
   checkOut  DateTime?
   location  String    @default("Main Floor")
   
-  // FIX: This matches the 'createdAt' in your getGymStats query!
   createdAt DateTime  @default(now())
 }
 
 // FACT: Transactions (The "Value")
 model Transaction {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   memberId  String
-  member    Member   @relation(fields: [memberId], references: [id])
+  member    Member    @relation(fields: [memberId], references: [id])
   amount    Decimal
-  type      String   // e.g., "Membership", "Supplement"
+  type      String    // Will now be explicitly "Day Pass" or "Monthly Renewal"
   
-  createdAt DateTime @default(now())
-}
-
-enum MemberStatus {
-  ACTIVE
-  INACTIVE
-  CANCELLED
+  createdAt DateTime  @default(now())
 }
 
 model SystemSettings {
   id           String   @id @default("settings")
   revenueGoal  Decimal  @default(50000)
   updatedAt    DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String   // e.g., "MEMBER_DELETE", "GOAL_UPDATE", "STATUS_CHANGE"
+  entityId  String?  // The ID of the member or setting changed
+  details   String   // A human-readable description of what happened
+  adminName String   // Who did it (can be hardcoded for now or from your auth)
+  createdAt DateTime @default(now())
 }

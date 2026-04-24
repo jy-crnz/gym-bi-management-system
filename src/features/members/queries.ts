@@ -1,14 +1,86 @@
 import { prisma } from "@/lib/prisma";
 
 /**
- * ---------------------------------------------------------------------------
- * ARCHITECTURE KINDNESS: The Time Engine
- * ---------------------------------------------------------------------------
- * Translates URL string ranges into secure Date objects for Prisma.
- * This ensures all BI charts sync to the same exact time window.
+ * 🏛️ ARCHITECTURE IS KINDNESS: The Auto-Sync Engine
+ * Upgraded with Information Assurance (System Logging).
+ * It now leaves a footprint whenever it intervenes to protect data integrity.
+ */
+async function syncExpiredMembers() {
+    const now = new Date();
+    try {
+        // 1. 🔍 Identify the anomalies (Active members with expired dates)
+        const expiredMembers = await prisma.member.findMany({
+            where: {
+                status: "ACTIVE",
+                activeUntil: { lt: now }
+            },
+            select: { id: true, name: true }
+        });
+
+        // If no one needs fixing, exit quietly.
+        if (expiredMembers.length === 0) return;
+
+        // 2. 🛠️ Perform the bulk cleanup
+        await prisma.member.updateMany({
+            where: {
+                id: { in: expiredMembers.map(m => m.id) }
+            },
+            data: { status: "INACTIVE" }
+        });
+
+        // 3. 📜 THE SILENT FOOTPRINT: Log the automated actions
+        const logs = expiredMembers.map(member => ({
+            action: "SYSTEM_AUTO_DEACTIVATE",
+            entityId: member.id,
+            details: `SYSTEM ACTION: Automatically deactivated ${member.name} due to pass expiration.`,
+            adminName: "IronBI (Automated)" // Distinguishes from human admins
+        }));
+
+        await prisma.auditLog.createMany({
+            data: logs
+        });
+
+    } catch (error) {
+        console.error("SYNC_ERROR:", error);
+    }
+}
+
+/**
+ * 🏛️ ARCHITECTURE IS KINDNESS: The Universal Risk Engine
+ * This centralized logic ensures the "Truth" about churn risk is consistent 
+ * across the entire BI system.
+ */
+function calculateRisk(activeUntil: string | Date | null): number {
+    if (!activeUntil) return 0.95; // No pass = Extreme Risk
+
+    const now = new Date();
+    const expiry = new Date(activeUntil);
+    const isExpired = expiry < now;
+
+    if (isExpired) {
+        const diffTime = Math.abs(now.getTime() - expiry.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        /**
+         * 🧠 BI ALGORITHM:
+         * Just expired today/yesterday: 70% Risk (Critical window for renewal)
+         * Expired > 7 days: 85% Risk (Cold lead)
+         * Expired > 14 days: 95% Risk (Likely churned)
+         */
+        if (diffDays > 14) return 0.95;
+        if (diffDays > 7) return 0.85;
+        return 0.70;
+    }
+
+    // Still active? 5% base risk.
+    return 0.05;
+}
+
+/**
+ * 🏛️ ARCHITECTURE KINDNESS: The Time Engine
  */
 function getDateFromRange(range: string): Date | undefined {
-    if (range === "all") return undefined; // undefined tells Prisma not to filter by date
+    if (range === "all") return undefined;
 
     const date = new Date();
     switch (range) {
@@ -22,7 +94,7 @@ function getDateFromRange(range: string): Date | undefined {
             date.setDate(date.getDate() - 90);
             break;
         default:
-            date.setDate(date.getDate() - 30); // Default fallback
+            date.setDate(date.getDate() - 30);
     }
     return date;
 }
@@ -33,30 +105,29 @@ function getDateFromRange(range: string): Date | undefined {
  * ---------------------------------------------------------------------------
  */
 
-/**
- * BI GOAL: Paginated, Filtered, and Searchable Member Directory.
- */
 export async function getMembers({
     range = "30d",
     page = 1,
     query = "",
     status,
-    tier
+    passType
 }: {
     range?: string;
     page?: number;
     query?: string;
     status?: string;
-    tier?: string;
+    passType?: string;
 }) {
-    // 1. Time Engine Filter
+    // 🏛️ SYNC FIRST: Ensure data integrity before fetching
+    await syncExpiredMembers();
+
     const startDate = getDateFromRange(range);
 
-    // 2. Build the exact "Where" clause dynamically
     const where: any = {};
     if (startDate) where.createdAt = { gte: startDate };
     if (status && status !== "ALL") where.status = status;
-    if (tier && tier !== "ALL") where.tier = tier;
+    if (passType && passType !== "ALL") where.passType = passType;
+
     if (query) {
         where.OR = [
             { name: { contains: query, mode: "insensitive" } },
@@ -64,12 +135,10 @@ export async function getMembers({
         ];
     }
 
-    // 3. Pagination Math
-    const limit = 5; // Show 5 members per page to fit nicely in the UI
+    const limit = 5;
     const skip = (page - 1) * limit;
 
     try {
-        // Run both queries simultaneously (Count total + Get actual data)
         const [members, totalCount] = await Promise.all([
             prisma.member.findMany({
                 where,
@@ -80,8 +149,14 @@ export async function getMembers({
             prisma.member.count({ where })
         ]);
 
+        // 🏛️ ENRICHMENT: Calculate risk for every member in the list
+        const enrichedMembers = members.map(member => ({
+            ...member,
+            churnRiskScore: calculateRisk(member.activeUntil)
+        }));
+
         return {
-            data: JSON.parse(JSON.stringify(members)),
+            data: JSON.parse(JSON.stringify(enrichedMembers)),
             metadata: {
                 total: totalCount,
                 totalPages: Math.ceil(totalCount / limit),
@@ -101,25 +176,28 @@ export async function getMembers({
  */
 
 export async function getGymStats(range: string = "30d") {
+    // 🏛️ SYNC FIRST: Ensures KPI accuracy
+    await syncExpiredMembers();
+
     const startDate = getDateFromRange(range);
     const dateFilter = startDate ? { createdAt: { gte: startDate } } : {};
 
     try {
-        const totalMembers = await prisma.member.count({ where: dateFilter }).catch(() => 0);
+        const totalMembers = await prisma.member.count({ where: dateFilter });
         const activeMembers = await prisma.member.count({
             where: { ...dateFilter, status: "ACTIVE" }
-        }).catch(() => 0);
+        });
 
         const todayStart = new Date();
         todayStart.setHours(0, 0, 0, 0);
         const todayAttendance = await prisma.attendance.count({
             where: { checkIn: { gte: todayStart } },
-        }).catch(() => 0);
+        });
 
         const revenueData = await prisma.transaction.aggregate({
             _sum: { amount: true },
             where: dateFilter
-        }).catch(() => ({ _sum: { amount: 0 } }));
+        });
 
         return {
             totalMembers,
@@ -204,8 +282,7 @@ export async function getRevenueTrend(range: string = "30d") {
         const trendMap = new Map();
         transactions.forEach((tx) => {
             const date = new Date(tx.createdAt).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric'
+                month: 'short', day: 'numeric'
             });
             const current = trendMap.get(date) || 0;
             trendMap.set(date, current + Number(tx.amount));
@@ -250,13 +327,8 @@ export async function getPeakHoursData(range: string = "30d") {
     }
 }
 
-/**
- * 🏛️ NEW BI GOAL: Cohort Retention Engine
- * Calculates what percentage of members return 1 month, 2 months, and 3 months after joining.
- */
 export async function getCohortRetention() {
     try {
-        // Fetch members who joined in the last 6 months to keep the matrix focused
         const sixMonthsAgo = new Date();
         sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
         sixMonthsAgo.setDate(1);
@@ -269,7 +341,6 @@ export async function getCohortRetention() {
             }
         });
 
-        // Group by Cohort (Month Joined)
         const cohorts: Record<string, { total: number, m1: number, m2: number, m3: number }> = {};
 
         members.forEach(member => {
@@ -282,7 +353,6 @@ export async function getCohortRetention() {
 
             cohorts[cohortKey].total += 1;
 
-            // Check if they attended in 30-day windows after joining
             const hasAttendanceInWindow = (startDays: number, endDays: number) => {
                 return member.attendance.some(a => {
                     const diffTime = new Date(a.checkIn).getTime() - joinDate.getTime();
@@ -296,7 +366,6 @@ export async function getCohortRetention() {
             if (hasAttendanceInWindow(61, 90)) cohorts[cohortKey].m3 += 1;
         });
 
-        // Format as percentages for the UI
         return Object.entries(cohorts).map(([cohort, data]) => ({
             cohort,
             total: data.total,
@@ -323,20 +392,20 @@ export async function getMembershipDistribution(range: string = "30d") {
     try {
         const members = await prisma.member.findMany({
             where: dateFilter,
-            select: { tier: true }
+            select: { passType: true }
         });
 
         const distribution = members.reduce((acc: Record<string, number>, member) => {
-            acc[member.tier] = (acc[member.tier] || 0) + 1;
+            acc[member.passType] = (acc[member.passType] || 0) + 1;
             return acc;
         }, {});
 
-        const COLORS = { BASIC: "#94a3b8", PREMIUM: "#3b82f6", VIP: "#f59e0b" };
+        const COLORS = { DAY_PASS: "#94a3b8", MONTHLY: "#3b82f6" };
 
-        return Object.entries(distribution).map(([tier, count]) => ({
-            name: tier,
+        return Object.entries(distribution).map(([passType, count]) => ({
+            name: passType === "DAY_PASS" ? "Day Pass" : "Monthly",
             value: count,
-            fill: COLORS[tier as keyof typeof COLORS] || "#cbd5e1",
+            fill: COLORS[passType as keyof typeof COLORS] || "#cbd5e1",
         }));
     } catch (error) {
         console.error("DISTRIBUTION_QUERY_ERROR:", error);
@@ -344,44 +413,70 @@ export async function getMembershipDistribution(range: string = "30d") {
     }
 }
 
-export async function getChurnRiskMembers(range?: string) {
+/**
+ * 🏛️ BI ENGINE: Proactive Churn & Re-engagement Prediction
+ * Updated: Now captures "Recent Expirations" (last 48h) even if status is INACTIVE,
+ * alongside "Upcoming Expirations" (next 3 days) for ACTIVE members.
+ */
+export async function getChurnRiskMembers() {
     try {
         const now = new Date();
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+        // 1. Define the "Golden Windows"
+        const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+        const fortyEightHoursAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
 
         const atRisk = await prisma.member.findMany({
             where: {
-                status: "ACTIVE",
                 OR: [
-                    { attendance: { none: {} } },
-                    { attendance: { every: { checkIn: { lt: sevenDaysAgo } } } }
+                    // Group A: About to leave (next 3 days)
+                    {
+                        status: "ACTIVE",
+                        activeUntil: { lt: threeDaysFromNow }
+                    },
+                    // Group B: Recently left (last 48 hours)
+                    {
+                        status: "INACTIVE",
+                        activeUntil: { gte: fortyEightHoursAgo, lt: now }
+                    }
                 ]
             },
-            include: {
-                // 🏛️ We need the last attendance to calculate the days
-                attendance: {
-                    orderBy: { checkIn: 'desc' },
-                    take: 1
-                }
-            },
             take: 5,
-            orderBy: { createdAt: 'asc' }
+            orderBy: { activeUntil: 'asc' }
         });
 
-        // 🏛️ CALCULATE THE DAYS MANUALLY BEFORE RETURNING
         const formattedMembers = atRisk.map(member => {
-            const lastAttendance = member.attendance[0]?.checkIn;
-            const lastDate = lastAttendance ? new Date(lastAttendance) : new Date(member.createdAt);
+            const activeUntil = member.activeUntil ? new Date(member.activeUntil) : new Date();
+            const diffTime = activeUntil.getTime() - now.getTime();
 
-            // Calculate difference in days
-            const diffTime = Math.abs(now.getTime() - lastDate.getTime());
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            // 🏛️ Same logic used in your report page
+            const diffDays = diffTime > 0
+                ? Math.floor(diffTime / (1000 * 60 * 60 * 24))
+                : Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            const isExpired = diffTime < 0;
+
+            let riskStatus = "";
+            if (isExpired) {
+                // Show "Expired X hours ago" if within today, otherwise "1 Day"
+                const absDiffHours = Math.floor(Math.abs(diffTime) / (1000 * 60 * 60));
+                if (absDiffHours < 24) {
+                    riskStatus = `Expired ${absDiffHours}h ago`;
+                } else {
+                    riskStatus = `Expired yesterday`;
+                }
+            } else if (diffDays === 0) {
+                riskStatus = "Expires today";
+            } else {
+                riskStatus = `Expires in ${diffDays} day${diffDays === 1 ? '' : 's'}`;
+            }
 
             return {
                 ...member,
-                daysInactive: diffDays, // This adds the missing variable!
-                lastCheckIn: lastAttendance || null
+                daysInactive: isExpired ? 1 : 0,
+                isExpired,
+                riskStatus,
+                churnRiskScore: calculateRisk(member.activeUntil)
             };
         });
 
@@ -409,6 +504,7 @@ export async function getMemberByEmail(email: string) {
         return null;
     }
 }
+
 export async function getMemberById(id: string) {
     try {
         const member = await prisma.member.findUnique({
@@ -421,38 +517,83 @@ export async function getMemberById(id: string) {
 
         if (!member) return null;
 
-        // 🏛️ BI LOGIC: Dynamic Churn Calculation
-        const now = new Date();
-        const lastCheckIn = member.attendance[0]?.checkIn;
-        const referenceDate = lastCheckIn ? new Date(lastCheckIn) : new Date(member.createdAt);
-
-        const diffTime = Math.abs(now.getTime() - referenceDate.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-        /**
-         * 🧠 Risk Algorithm:
-         * 0-7 days: 5% (Healthy)
-         * 8-14 days: 25% (Warning)
-         * 15-30 days: 60% (High Risk)
-         * 30+ days: 90%+ (Critical)
-         */
-        let calculatedRisk = 0.05; // Base risk
-
-        if (diffDays > 30) {
-            calculatedRisk = 0.95;
-        } else if (diffDays > 14) {
-            calculatedRisk = 0.60;
-        } else if (diffDays > 7) {
-            calculatedRisk = 0.25;
-        }
-
-        // Return the member with the REAL calculated score
         return JSON.parse(JSON.stringify({
             ...member,
-            churnRiskScore: calculatedRisk
+            churnRiskScore: calculateRisk(member.activeUntil)
         }));
     } catch (error) {
         console.error("GET_MEMBER_ERROR:", error);
         return null;
+    }
+}
+
+/**
+ * ---------------------------------------------------------------------------
+ * SECTION 6: ANALYTICS REPORTS
+ * ---------------------------------------------------------------------------
+ */
+
+/**
+ * 🏛️ ANALYTICS ENGINE: Retention Diagnostic Report
+ * Fixed: TypeScript 'No overload matches' error by explicitly narrowing null values.
+ */
+export async function getRetentionReportData() {
+    try {
+        const now = new Date();
+
+        const members = await prisma.member.findMany({
+            where: {
+                OR: [
+                    { status: "INACTIVE" },
+                    { activeUntil: { lt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) } }
+                ]
+            },
+            orderBy: { activeUntil: 'asc' }
+        });
+
+        const reportData = members.map(member => {
+            const rawDate = member.activeUntil;
+
+            let isExpired = false;
+            let inactivityLabel = "No Active Pass";
+
+            if (rawDate) {
+                const activeUntil = new Date(rawDate);
+                const diffTime = activeUntil.getTime() - now.getTime();
+
+                isExpired = diffTime < 0;
+
+                if (isExpired) {
+                    const absDiffDays = Math.floor(Math.abs(diffTime) / (1000 * 60 * 60 * 24));
+                    const displayDays = absDiffDays + 1;
+                    inactivityLabel = `${displayDays} Day${displayDays === 1 ? '' : 's'}`;
+                } else {
+                    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                    inactivityLabel = diffDays === 0
+                        ? "0 Days (Expires Today)"
+                        : `${diffDays} Day${diffDays === 1 ? '' : 's'}`;
+                }
+            }
+
+            const score = calculateRisk(member.activeUntil);
+            let riskLevel = "LOW RISK";
+            if (score >= 0.95) riskLevel = "CHURNED";
+            else if (score >= 0.85) riskLevel = "CRITICAL";
+            else if (score >= 0.70) riskLevel = "HIGH RISK";
+
+            return {
+                id: member.id,
+                name: member.name,
+                inactivityLabel,
+                riskLevel,
+                isExpired,
+                churnRiskScore: score
+            };
+        });
+
+        return JSON.parse(JSON.stringify(reportData));
+    } catch (error) {
+        console.error("RETENTION_REPORT_QUERY_ERROR:", error);
+        return [];
     }
 }

@@ -18,8 +18,9 @@ import {
 interface MemberPortalData {
     id: string;
     name: string;
-    tier: "BASIC" | "PREMIUM" | "VIP";
+    passType: "DAY_PASS" | "MONTHLY";
     status: string;
+    activeUntil: string | null; // 🏛️ ADDED: Required for the time guard
     attendance: { checkIn: string }[];
 }
 
@@ -33,15 +34,26 @@ export default async function MemberPortalPage({
 
     if (!member) return notFound();
 
-    // 🏛️ STATUS GUARD: Revokes access immediately if status isn't ACTIVE
-    if (member.status !== "ACTIVE") {
-        redirect("/login?error=membership_inactive");
+    /**
+     * 🏛️ THE TEMPORAL SECURITY HANDSHAKE
+     * In BI systems, 'Status' is what we say, but 'Date' is what is true.
+     */
+    const now = new Date();
+    const expiryDate = member.activeUntil ? new Date(member.activeUntil) : null;
+
+    // Logic: If there's no date, or the date is in the past, they are expired.
+    const isExpired = expiryDate ? expiryDate < now : true;
+
+    // 🏛️ REFINED GUARD: Kicks out members if they are inactive OR expired.
+    if (member.status !== "ACTIVE" || isExpired) {
+        redirect("/login?error=membership_expired");
     }
 
     const totalVisits = member.attendance.length;
 
     return (
         <div className="min-h-screen bg-zinc-950 text-zinc-100 selection:bg-emerald-500/30 overflow-x-hidden relative font-sans antialiased">
+            {/* ... rest of your beautiful UI code ... */}
 
             {/* ── BACKGROUND ARCHITECTURE ── */}
             <div className="fixed inset-0 z-0">
@@ -50,7 +62,6 @@ export default async function MemberPortalPage({
             </div>
 
             <div className="max-w-md mx-auto px-6 pt-8 pb-20 relative z-10 space-y-8">
-
                 {/* ── TOP NAV / BRANDING ── */}
                 <header className="flex justify-between items-center">
                     <div className="flex items-center gap-2.5">
@@ -66,23 +77,20 @@ export default async function MemberPortalPage({
                 </header>
 
                 {/* ── MAIN DIGITAL ID CARD ── */}
-                <section className="relative group isolate"> {/* 🏛️ Added isolate for cleaner sub-pixel rendering */}
+                <section className="relative group isolate">
                     <div className="absolute -inset-0.5 bg-linear-to-b from-emerald-500/20 to-transparent rounded-[2.5rem] blur-md opacity-75 pointer-events-none" />
 
                     <div className="
                         relative bg-zinc-900 border border-white/5 rounded-[2.5rem] p-8 shadow-2xl 
                         overflow-hidden
-                        /* 🏛️ THE STABILITY STACK: Prevents dashed/flickering lines */
                         transform-gpu 
                         translate-z-0 
                         backface-visibility-hidden
                         will-change-transform
                     ">
-                        {/* Decorative Scanline effect */}
                         <div className="absolute inset-0 bg-linear-to-b from-emerald-500/2 to-transparent pointer-events-none z-0" />
 
                         <div className="relative z-10 flex flex-col items-center text-center space-y-6">
-                            {/* Member Header */}
                             <div className="space-y-1">
                                 <h2 className="text-3xl font-black tracking-tighter uppercase italic">
                                     {member.name.split(' ')[0]}<span className="text-emerald-500">.ID</span>
@@ -93,11 +101,9 @@ export default async function MemberPortalPage({
                                 </div>
                             </div>
 
-                            {/* QR Focus */}
                             <div className="
                                 relative p-4 bg-white rounded-3xl shadow-[0_0_50px_rgba(16,185,129,0.15)] 
                                 group-hover:scale-[1.02] transition-transform duration-500 
-                                /* 🏛️ QR BOX RENDERING FIXES */
                                 antialiased 
                                 ring-1 ring-inset ring-zinc-200/10
                             ">
@@ -107,14 +113,11 @@ export default async function MemberPortalPage({
                                 </div>
                             </div>
 
-                            {/* Card Footer Info */}
                             <div className="grid grid-cols-2 w-full pt-4 gap-4 border-t border-white/5">
                                 <div className="text-left">
-                                    <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mb-1">Membership</p>
-                                    <p className={`text-sm font-black italic tracking-tight ${member.tier === 'VIP' ? 'text-amber-400' :
-                                        member.tier === 'PREMIUM' ? 'text-blue-400' : 'text-zinc-300'
-                                        }`}>
-                                        {member.tier} TIER
+                                    <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mb-1">Access Type</p>
+                                    <p className={`text-sm font-black italic tracking-tight ${member.passType === 'MONTHLY' ? 'text-blue-400' : 'text-zinc-300'}`}>
+                                        {member.passType === 'MONTHLY' ? 'Monthly' : 'Day Pass'}
                                     </p>
                                 </div>
                                 <div className="text-right">
@@ -126,7 +129,7 @@ export default async function MemberPortalPage({
                     </div>
                 </section>
 
-                {/* ── TELEMETRY GRID (Stats) ── */}
+                {/* ── TELEMETRY GRID ── */}
                 <section className="grid grid-cols-2 gap-4">
                     <div className="bg-zinc-900/40 border border-zinc-800/50 p-5 rounded-3xl relative overflow-hidden group hover:bg-zinc-900/60 transition-colors">
                         <Zap className="absolute -right-2 -top-2 w-12 h-12 text-emerald-500/5 rotate-12" />
@@ -162,7 +165,6 @@ export default async function MemberPortalPage({
                     </div>
                 </section>
 
-                {/* ── ACCOUNT DANGER ZONE ── */}
                 <footer className="pt-8 space-y-8">
                     <div className="bg-red-500/5 border border-red-500/10 rounded-3xl p-6 flex flex-col items-center gap-4 group/danger transition-colors hover:bg-red-500/8">
                         <div className="flex items-center gap-2 text-red-500/60 group-hover/danger:text-red-500 transition-colors">
@@ -171,16 +173,7 @@ export default async function MemberPortalPage({
                         </div>
                         <CancelMembershipButton memberId={member.id} />
                     </div>
-
-                    <div className="flex flex-col items-center gap-4 opacity-30">
-                        <div className="h-px w-12 bg-zinc-800" />
-                        <div className="text-center space-y-1">
-                            <p className="text-[8px] font-bold uppercase tracking-[0.5em] text-zinc-500">IronBI Terminal</p>
-                            <p className="text-[7px] font-medium text-zinc-600 uppercase tracking-widest">Fly High Coders • Version 1.0.0</p>
-                        </div>
-                    </div>
                 </footer>
-
             </div>
         </div>
     );

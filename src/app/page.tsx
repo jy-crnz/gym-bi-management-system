@@ -21,6 +21,9 @@ import { DirectoryControls } from "@/features/members/components/DirectoryContro
 // 🏛️ Membership Lifecycle Component
 import { StatusEditor } from "@/features/members/components/StatusEditor";
 
+// 🏛️ Security & Audit Component
+import { SystemActivityFeed } from "@/features/members/components/SystemActivityFeed";
+
 import {
   getMembers,
   getGymStats,
@@ -33,9 +36,6 @@ import {
   getCohortRetention,
 } from "@/features/members/queries";
 
-// 🏛️ ARCHITECTURE IS KINDNESS: Force Real-Time Data.
-// This prevents Vercel/Next.js from taking a static snapshot of the dashboard.
-// Every visit will now query the live database, ensuring metrics are 100% accurate.
 export const dynamic = "force-dynamic";
 
 interface SerializedMember {
@@ -43,7 +43,7 @@ interface SerializedMember {
   name: string;
   email: string;
   status: "ACTIVE" | "INACTIVE" | "CANCELLED";
-  tier: "BASIC" | "PREMIUM" | "VIP";
+  passType: "DAY_PASS" | "MONTHLY";
   createdAt: string;
 }
 
@@ -65,7 +65,7 @@ function DumbbellIcon({ className }: { className?: string }) {
 
 function LivePill() {
   return (
-    <div className="flex items-center gap-1.5 bg-zinc-800 border border-zinc-700 rounded-full px-3 py-1 shadow-sm">
+    <div className="flex items-center gap-1.5 bg-zinc-800 border border-zinc-700 rounded-full px-3 py-1">
       <span className="relative flex h-1.5 w-1.5">
         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
         <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
@@ -87,15 +87,14 @@ function SectionDivider({ label }: { label: string }) {
   );
 }
 
-function TierBadge({ tier }: { tier: SerializedMember["tier"] }) {
-  const styles: Record<SerializedMember["tier"], string> = {
-    VIP: "bg-amber-500/10  text-amber-400  ring-1 ring-amber-500/20",
-    PREMIUM: "bg-blue-500/10   text-blue-400   ring-1 ring-blue-500/20",
-    BASIC: "bg-zinc-700/60   text-zinc-400   ring-1 ring-zinc-600/40",
+function PassBadge({ type }: { type: SerializedMember["passType"] }) {
+  const styles: Record<SerializedMember["passType"], string> = {
+    MONTHLY: "bg-blue-500/10  text-blue-400  ring-1 ring-blue-500/20",
+    DAY_PASS: "bg-zinc-700/60   text-zinc-400   ring-1 ring-zinc-600/40",
   };
   return (
-    <span className={`w-fit inline-flex text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${styles[tier]}`}>
-      {tier}
+    <span className={`w-fit inline-flex text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${styles[type]}`}>
+      {type === "MONTHLY" ? "Monthly" : "Day Pass"}
     </span>
   );
 }
@@ -126,7 +125,7 @@ export default async function Home(props: {
   const range = (searchParams?.range as string) || "30d";
   const query = (searchParams?.q as string) || "";
   const status = (searchParams?.status as string) || undefined;
-  const tier = (searchParams?.tier as string) || undefined;
+  const passType = (searchParams?.passType as string) || (searchParams?.tier as string) || undefined;
   const page = Number(searchParams?.page) || 1;
 
   // 2. Optimized Parallel Execution
@@ -137,7 +136,7 @@ export default async function Home(props: {
     peakHours,
     churnRisk,
     goal,
-    tiers,
+    passDistribution,
     cohortData,
     membersResult
   ] = await Promise.all([
@@ -145,11 +144,11 @@ export default async function Home(props: {
     getFinancialHealth(range),
     getRevenueTrend(range),
     getPeakHoursData(range),
-    getChurnRiskMembers(range),
+    getChurnRiskMembers(),
     getRevenueGoalProgress(range),
     getMembershipDistribution(range),
     getCohortRetention(),
-    getMembers({ range, page, query, status, tier })
+    getMembers({ range, page, query, status, passType })
   ]);
 
   const members = membersResult.data as SerializedMember[];
@@ -159,7 +158,7 @@ export default async function Home(props: {
     <div className="flex flex-col min-h-screen bg-zinc-950 font-sans selection:bg-emerald-500/30">
 
       {/* ── HEADER ──────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-30 w-full bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800 shadow-sm">
+      <header className="sticky top-0 z-30 w-full bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 shrink-0">
             <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]">
@@ -179,7 +178,10 @@ export default async function Home(props: {
 
           <div className="flex items-center gap-3 shrink-0">
             <QRScanner />
-            <ExportReportButton data={{ stats, tiers }} />
+            <ExportReportButton
+              data={{ stats, tiers: passDistribution }}
+              range={range}
+            />
             <div className="hidden md:block w-px h-5 bg-zinc-800 mx-2" />
             <SignOutButton />
           </div>
@@ -189,7 +191,6 @@ export default async function Home(props: {
       {/* ── MAIN ────────────────────────────────────────────────────────── */}
       <main className="flex-1 w-full max-w-6xl mx-auto px-6 py-10">
 
-        {/* --- HEADER --- */}
         <div className="mb-10 flex flex-col sm:flex-row sm:items-end justify-between gap-6">
           <div>
             <h1 className="text-3xl font-black text-white tracking-tight">Command Center</h1>
@@ -212,7 +213,6 @@ export default async function Home(props: {
         <SectionDivider label="Operations Desk" />
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
 
-          {/* Left: Registration */}
           <div className="xl:col-span-4 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6 xl:sticky xl:top-24">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center">
@@ -226,8 +226,7 @@ export default async function Home(props: {
             <RegistrationForm />
           </div>
 
-          {/* Right: Directory - 🏛️ PRO FIX: We removed 'overflow-hidden' from main card to let menus float */}
-          <div className="xl:col-span-8 rounded-2xl border border-zinc-800 bg-zinc-900/50 relative shadow-sm">
+          <div className="xl:col-span-8 rounded-2xl border border-zinc-800 bg-zinc-900/50 relative">
             <div className="px-6 py-4 flex items-center justify-between bg-zinc-900 rounded-t-2xl border-b border-zinc-800">
               <div>
                 <h3 className="text-sm font-bold text-zinc-100">Live Directory</h3>
@@ -240,8 +239,7 @@ export default async function Home(props: {
 
             <DirectoryControls totalPages={metadata.totalPages} currentPage={metadata.currentPage} />
 
-            {/* 🏛️ PRO FIX: xl:overflow-visible ensures menus float, overflow-x-auto stays for mobile */}
-            <div className="xl:overflow-visible overflow-x-auto custom-scrollbar">
+            <div className="xl:overflow-visible overflow-x-auto">
               <table className="w-full text-sm text-left">
                 <thead>
                   <tr className="text-[9px] font-black uppercase tracking-[0.15em] text-zinc-500 bg-zinc-950/50">
@@ -265,7 +263,7 @@ export default async function Home(props: {
                               <Link href={`/members/${member.id}`} className="font-semibold text-zinc-100 hover:text-emerald-400 transition-colors truncate text-sm">
                                 {member.name}
                               </Link>
-                              <TierBadge tier={member.tier} />
+                              <PassBadge type={member.passType} />
                             </div>
                           </div>
                         </td>
@@ -291,11 +289,11 @@ export default async function Home(props: {
 
         {/* ZONE 3: BUSINESS INTELLIGENCE */}
         <SectionDivider label="Business Intelligence" />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start mb-12">
           <div className="space-y-8">
             <GoalTracker current={goal.current} target={goal.target} percentage={goal.percentage} />
             <RevenueChart data={trend} />
-            <TierDistributionChart data={tiers} />
+            <TierDistributionChart data={passDistribution} />
           </div>
           <div className="space-y-8">
             <PeakHoursChart data={peakHours} />
@@ -303,7 +301,13 @@ export default async function Home(props: {
           </div>
         </div>
 
-        {/* ZONE 4: RETENTION ANALYTICS */}
+        {/* 🏛️ ZONE 4: SECURITY & AUDIT (NEW FEATURE) */}
+        <SectionDivider label="Information Assurance" />
+        <div className="mb-12 h-112.5">
+          <SystemActivityFeed />
+        </div>
+
+        {/* ZONE 5: RETENTION ANALYTICS */}
         <SectionDivider label="Long-term Retention" />
         <CohortMatrix data={cohortData} />
 
