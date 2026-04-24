@@ -21,7 +21,7 @@ export function CheckInButton({ memberId }: { memberId: string }) {
       alert(result.error);
     } else {
       // Logic for a successful check-in
-      console.log("Attendance logged:", result.data);
+      console.log("Attendance logged:", result.name);
     }
 
     setLoading(false);
