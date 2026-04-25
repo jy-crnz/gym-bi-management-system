@@ -458,7 +458,11 @@ export async function getChurnRiskMembers() {
             let riskStatus = "";
             if (isExpired) {
                 const absDiffHours = Math.floor(Math.abs(diffTime) / (1000 * 60 * 60));
-                if (absDiffHours < 24) {
+
+                // 🏛️ FIX: Catch the "less than 1 hour" edge case
+                if (absDiffHours === 0) {
+                    riskStatus = "Expired just now";
+                } else if (absDiffHours < 24) {
                     riskStatus = `Expired ${absDiffHours}h ago`;
                 } else {
                     riskStatus = `Expired yesterday`;
