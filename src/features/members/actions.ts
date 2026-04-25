@@ -4,10 +4,19 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { MemberSchema, type MemberInput } from "./schemas";
+
 /* 🏛️ INFORMATION ASSURANCE: Security & Audit Imports */
 import { headers } from "next/headers";
 import { loginRateLimiter } from "@/lib/ratelimit";
 import { createAuditEntry } from "@/lib/audit";
+
+/* ✉️ ENGAGEMENT ENGINE: Resend Integration */
+import { Resend } from "resend";
+import { RetentionEmail } from "@/emails/RetentionEmail";
+
+// Initialize the Email Service
+// Ensure RESEND_API_KEY is defined in your .env and Vercel settings
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export type LoginResult =
     | { error: string; memberId?: never }
@@ -15,8 +24,9 @@ export type LoginResult =
 
 /**
  * 🏛️ TEMPORAL CALIBRATION: The Offset Neutralizer
- * completely bypasses the node-postgres local time hijack by injecting
- * a reverse-offset shield into the Date object.
+ * Completely bypasses the node-postgres local time hijack by injecting
+ * a reverse-offset shield into the Date object. 
+ * This ensures the database physically stores 15:59:59 UTC (Manila Midnight).
  */
 function getManilaMidnight(): Date {
     const now = new Date();
@@ -29,12 +39,12 @@ function getManilaMidnight(): Date {
     const m = String(manilaTime.getUTCMonth() + 1).padStart(2, '0');
     const d = String(manilaTime.getUTCDate()).padStart(2, '0');
 
-    // 3. We want the database to physically store 15:59:59 (which is Manila 23:59:59)
+    // 3. Target: Manila 23:59:59.999 (stored as UTC 15:59:59.999)
     const targetUTC = new Date(`${y}-${m}-${d}T15:59:59.999Z`);
 
     // 4. 🛡️ THE SHIELD: Neutralize the node-postgres local timezone hijack.
     // We add the server's offset. When the pg driver subtracts the offset later, 
-    // it will perfectly cancel out and leave exactly 15:59:59.
+    // it will perfectly cancel out and leave exactly the intended UTC time.
     const serverOffsetMs = targetUTC.getTimezoneOffset() * 60 * 1000;
     const timezoneProofDate = new Date(targetUTC.getTime() + serverOffsetMs);
 
@@ -80,8 +90,41 @@ export async function loginAsMember(formData: FormData): Promise<LoginResult> {
 }
 
 // ---------------------------------------------------------------------------
-// SECTION 2: MEMBER MANAGEMENT
+// SECTION 2: MEMBER MANAGEMENT & ENGAGEMENT
 // ---------------------------------------------------------------------------
+
+/**
+ * ✉️ ENGAGEMENT ENGINE: Send Designed Retention Email
+ * Uses Resend to deliver a React-designed HTML template to at-risk members.
+ * Includes an Audit entry to track staff engagement actions.
+ */
+export async function sendRetentionEmail(email: string, name: string, memberId: string) {
+    try {
+        const { data, error } = await resend.emails.send({
+            from: 'IronBI Gym <onboarding@resend.dev>',
+            to: [email],
+            subject: 'Action Required: Your Membership Status',
+            react: RetentionEmail({ name }),
+        });
+
+        if (error) {
+            console.error("RESEND_ERROR:", error);
+            return { success: false, error };
+        }
+
+        // 🏛️ AUDIT TRAIL: Record that re-engagement was initiated
+        await createAuditEntry(
+            "MEMBER_CONTACT",
+            `Staff initiated re-engagement: Sent designed invite to ${name} (${email}).`,
+            memberId
+        );
+
+        return { success: true };
+    } catch (err) {
+        console.error("EMAIL_ACTION_ERROR:", err);
+        return { success: false, error: "System failure during email dispatch." };
+    }
+}
 
 export async function createMember(formData: MemberInput) {
     const validatedFields = MemberSchema.safeParse(formData);
@@ -108,8 +151,7 @@ export async function createMember(formData: MemberInput) {
     try {
         /**
          * 🏛️ ATOMIC REGISTRATION: 
-         * We wrap both operations in a transaction. If the transaction fails, 
-         * the member is never created (prevents "orphan" members with no payment).
+         * Wrap both operations in a transaction to prevent "orphan" members.
          */
         const member = await prisma.$transaction(async (tx) => {
             // 1. Create the Member record
@@ -120,7 +162,7 @@ export async function createMember(formData: MemberInput) {
                     status: validatedFields.data.status,
                     passType: validatedFields.data.passType,
                     activeUntil: activeUntil,
-                    totalSpent: initialAmount, // 🏛️ NEW: Sync the initial LTV
+                    totalSpent: initialAmount,
                 },
             });
 
@@ -213,7 +255,6 @@ export async function processPayment(memberId: string, amount: number, type: "DA
             newExpiry = new Date(baseDate);
             newExpiry.setDate(newExpiry.getDate() + 30);
         } else {
-            // Day passes shouldn't stack for days, they expire tonight at Manila Midnight.
             newExpiry = getManilaMidnight();
         }
 
@@ -225,7 +266,7 @@ export async function processPayment(memberId: string, amount: number, type: "DA
                     activeUntil: newExpiry,
                     status: "ACTIVE",
                     passType: type,
-                    totalSpent: { increment: amount } // 🏛️ NEW: Automatically add to their LTV
+                    totalSpent: { increment: amount }
                 }
             }),
             prisma.transaction.create({
@@ -240,7 +281,7 @@ export async function processPayment(memberId: string, amount: number, type: "DA
         // 3. 📜 THE FINANCIAL FOOTPRINT
         await createAuditEntry(
             "FINANCIAL_TRANSACTION",
-            `Processed ₱${amount} payment for ${member.name} (${type === "MONTHLY" ? "Monthly" : "Day Pass"}). Pass extended to ${newExpiry.toLocaleDateString()}.`,
+            `Processed ₱${amount} payment for ${member.name} (${type}). Pass extended to ${newExpiry.toLocaleDateString()}.`,
             memberId
         );
 
@@ -263,19 +304,13 @@ export async function logAttendance(memberId: string) {
     try {
         const now = new Date();
 
-        // 1. 🔍 THE HANDSHAKE
         const member = await prisma.member.findUnique({
             where: { id: memberId },
-            select: {
-                name: true,
-                status: true,
-                activeUntil: true
-            }
+            select: { name: true, status: true, activeUntil: true }
         });
 
         if (!member) return { error: "Invalid ID. Member not found." };
 
-        // 2. 🛡️ THE TEMPORAL GATE (Midnight Check)
         const expiryDate = member.activeUntil ? new Date(member.activeUntil) : null;
         const isExpired = expiryDate ? expiryDate < now : true;
 
@@ -286,15 +321,12 @@ export async function logAttendance(memberId: string) {
             };
         }
 
-        // 3. 🧊 THE COOLDOWN GUARD (New Logic)
         const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000);
 
         const recentCheckIn = await prisma.attendance.findFirst({
             where: {
                 memberId: memberId,
-                createdAt: {
-                    gte: fifteenMinutesAgo
-                }
+                createdAt: { gte: fifteenMinutesAgo }
             }
         });
 
@@ -305,21 +337,14 @@ export async function logAttendance(memberId: string) {
             };
         }
 
-        // 4. ✅ VALIDATED: Create the attendance record
         await prisma.attendance.create({
-            data: {
-                memberId: memberId,
-                location: "Main Floor",
-            }
+            data: { memberId: memberId, location: "Main Floor" }
         });
 
         revalidatePath("/");
         revalidatePath(`/members/${memberId}`);
 
-        return {
-            success: true,
-            name: member.name,
-        };
+        return { success: true, name: member.name };
 
     } catch (error) {
         console.error("ATTENDANCE_ERROR:", error);
@@ -329,7 +354,6 @@ export async function logAttendance(memberId: string) {
 
 export async function deleteMember(id: string) {
     try {
-        // 1. 🔍 THE LAST LOOK (Fetch name before destruction)
         const member = await prisma.member.findUnique({
             where: { id },
             select: { name: true }
@@ -337,14 +361,12 @@ export async function deleteMember(id: string) {
 
         if (!member) return { error: "Member not found." };
 
-        // 2. 🧨 THE DESTRUCTION (Atomic Transaction)
         await prisma.$transaction([
             prisma.attendance.deleteMany({ where: { memberId: id } }),
             prisma.transaction.deleteMany({ where: { memberId: id } }),
             prisma.member.delete({ where: { id } }),
         ]);
 
-        // 3. 📜 THE AUDIT LOG (Information Assurance)
         await createAuditEntry(
             "MEMBER_DELETE",
             `ADMIN ACTION: Permanently wiped member "${member.name}" and all history.`,
@@ -374,7 +396,6 @@ export async function updateRevenueGoal(newGoal: number) {
             create: { id: "settings", revenueGoal: newGoal },
         });
 
-        // 🏛️ AUDIT TRAIL: Record target modification
         await createAuditEntry(
             "SETTINGS_UPDATE",
             `Modified system revenue target to ₱${newGoal.toLocaleString()}`,

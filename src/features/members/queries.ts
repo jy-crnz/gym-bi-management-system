@@ -584,6 +584,7 @@ export async function getRetentionReportData() {
             return {
                 id: member.id,
                 name: member.name,
+                email: member.email, // 🏛️ ADDED: Passing email through for the Contact button
                 inactivityLabel,
                 riskLevel,
                 isExpired,
@@ -591,6 +592,7 @@ export async function getRetentionReportData() {
             };
         });
 
+        // 🏛️ Clean serialization for Next.js Server Components
         return JSON.parse(JSON.stringify(reportData));
     } catch (error) {
         console.error("RETENTION_REPORT_QUERY_ERROR:", error);
