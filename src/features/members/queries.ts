@@ -308,7 +308,12 @@ export async function getPeakHoursData(range: string = "30d") {
         const hoursMap = Array.from({ length: 24 }, (_, i) => ({ hour: i, count: 0 }));
 
         attendances.forEach((attendance) => {
-            const hour = new Date(attendance.checkIn).getHours();
+            // 🏛️ TEMPORAL CALIBRATION: Shift to Manila Time (+8 Hours)
+            const manilaTime = new Date(attendance.checkIn.getTime() + (8 * 60 * 60 * 1000));
+
+            // Extract the hour using getUTCHours() so Vercel's local timezone doesn't interfere
+            const hour = manilaTime.getUTCHours();
+
             if (hoursMap[hour]) hoursMap[hour].count++;
         });
 
