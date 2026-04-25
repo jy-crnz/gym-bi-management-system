@@ -77,26 +77,40 @@ function calculateRisk(activeUntil: string | Date | null): number {
 }
 
 /**
- * 🏛️ ARCHITECTURE KINDNESS: The Time Engine
+ * 🏛️ ARCHITECTURE KINDNESS: The Time Engine (Upgraded)
+ * Now supports precise bounds (gte and lte) for "today" and "yesterday"
+ * preventing the "Ghost Switch" bug where yesterday includes today.
  */
-function getDateFromRange(range: string): Date | undefined {
-    if (range === "all") return undefined;
+function getDateBounds(range: string): { gte?: Date, lte?: Date } {
+    if (range === "all") return {};
 
-    const date = new Date();
+    const now = new Date();
+    const start = new Date(now);
+    const end = new Date(now);
+
     switch (range) {
+        case "today":
+            start.setHours(0, 0, 0, 0);
+            return { gte: start };
+        case "yesterday":
+            start.setDate(start.getDate() - 1);
+            start.setHours(0, 0, 0, 0);
+            end.setDate(end.getDate() - 1);
+            end.setHours(23, 59, 59, 999);
+            return { gte: start, lte: end }; // 🏛️ strict boundary
         case "7d":
-            date.setDate(date.getDate() - 7);
-            break;
+            start.setDate(start.getDate() - 7);
+            return { gte: start };
         case "30d":
-            date.setDate(date.getDate() - 30);
-            break;
+            start.setDate(start.getDate() - 30);
+            return { gte: start };
         case "90d":
-            date.setDate(date.getDate() - 90);
-            break;
+            start.setDate(start.getDate() - 90);
+            return { gte: start };
         default:
-            date.setDate(date.getDate() - 30);
+            start.setDate(start.getDate() - 30);
+            return { gte: start };
     }
-    return date;
 }
 
 /**
@@ -118,13 +132,13 @@ export async function getMembers({
     status?: string;
     passType?: string;
 }) {
-    // 🏛️ SYNC FIRST: Ensure data integrity before fetching
     await syncExpiredMembers();
 
-    const startDate = getDateFromRange(range);
-
+    const dateBounds = getDateBounds(range);
     const where: any = {};
-    if (startDate) where.createdAt = { gte: startDate };
+
+    // 🏛️ Apply exact time boundaries
+    if (Object.keys(dateBounds).length > 0) where.createdAt = dateBounds;
     if (status && status !== "ALL") where.status = status;
     if (passType && passType !== "ALL") where.passType = passType;
 
@@ -149,7 +163,6 @@ export async function getMembers({
             prisma.member.count({ where })
         ]);
 
-        // 🏛️ ENRICHMENT: Calculate risk for every member in the list
         const enrichedMembers = members.map(member => ({
             ...member,
             churnRiskScore: calculateRisk(member.activeUntil)
@@ -176,11 +189,13 @@ export async function getMembers({
  */
 
 export async function getGymStats(range: string = "30d") {
-    // 🏛️ SYNC FIRST: Ensures KPI accuracy
     await syncExpiredMembers();
 
-    const startDate = getDateFromRange(range);
-    const dateFilter = startDate ? { createdAt: { gte: startDate } } : {};
+    const dateBounds = getDateBounds(range);
+    const dateFilter = Object.keys(dateBounds).length > 0 ? { createdAt: dateBounds } : {};
+
+    // 🏛️ Separate filter for attendance to map correctly to the time engine
+    const attendanceFilter = Object.keys(dateBounds).length > 0 ? { checkIn: dateBounds } : {};
 
     try {
         const totalMembers = await prisma.member.count({ where: dateFilter });
@@ -188,10 +203,9 @@ export async function getGymStats(range: string = "30d") {
             where: { ...dateFilter, status: "ACTIVE" }
         });
 
-        const todayStart = new Date();
-        todayStart.setHours(0, 0, 0, 0);
-        const todayAttendance = await prisma.attendance.count({
-            where: { checkIn: { gte: todayStart } },
+        // 🏛️ Now correctly calculates attendance based on "Today", "Yesterday", etc.
+        const periodAttendance = await prisma.attendance.count({
+            where: attendanceFilter,
         });
 
         const revenueData = await prisma.transaction.aggregate({
@@ -202,7 +216,7 @@ export async function getGymStats(range: string = "30d") {
         return {
             totalMembers,
             activeMembers,
-            todayAttendance,
+            todayAttendance: periodAttendance, // Kept property name for component compatibility
             totalRevenue: Number(revenueData._sum?.amount || 0)
         };
     } catch (error) {
@@ -235,8 +249,8 @@ export async function getRevenueGoalProgress(range: string = "30d") {
 }
 
 export async function getFinancialHealth(range: string = "30d") {
-    const startDate = getDateFromRange(range);
-    const dateFilter = startDate ? { createdAt: { gte: startDate } } : {};
+    const dateBounds = getDateBounds(range);
+    const dateFilter = Object.keys(dateBounds).length > 0 ? { createdAt: dateBounds } : {};
 
     try {
         const activeMembersCount = await prisma.member.count({
@@ -270,8 +284,8 @@ export async function getFinancialHealth(range: string = "30d") {
  */
 
 export async function getRevenueTrend(range: string = "30d") {
-    const startDate = getDateFromRange(range);
-    const dateFilter = startDate ? { createdAt: { gte: startDate } } : {};
+    const dateBounds = getDateBounds(range);
+    const dateFilter = Object.keys(dateBounds).length > 0 ? { createdAt: dateBounds } : {};
 
     try {
         const transactions = await prisma.transaction.findMany({
@@ -296,24 +310,20 @@ export async function getRevenueTrend(range: string = "30d") {
 }
 
 export async function getPeakHoursData(range: string = "30d") {
-    const startDate = getDateFromRange(range);
-    const safeStartDate = startDate || new Date(new Date().setDate(new Date().getDate() - 30));
+    const dateBounds = getDateBounds(range);
+    const attendanceFilter = Object.keys(dateBounds).length > 0 ? { checkIn: dateBounds } : {};
 
     try {
         const attendances = await prisma.attendance.findMany({
-            where: { checkIn: { gte: safeStartDate } },
+            where: attendanceFilter,
             select: { checkIn: true },
         });
 
         const hoursMap = Array.from({ length: 24 }, (_, i) => ({ hour: i, count: 0 }));
 
         attendances.forEach((attendance) => {
-            // 🏛️ TEMPORAL CALIBRATION: Shift to Manila Time (+8 Hours)
             const manilaTime = new Date(attendance.checkIn.getTime() + (8 * 60 * 60 * 1000));
-
-            // Extract the hour using getUTCHours() so Vercel's local timezone doesn't interfere
             const hour = manilaTime.getUTCHours();
-
             if (hoursMap[hour]) hoursMap[hour].count++;
         });
 
@@ -391,8 +401,8 @@ export async function getCohortRetention() {
  */
 
 export async function getMembershipDistribution(range: string = "30d") {
-    const startDate = getDateFromRange(range);
-    const dateFilter = startDate ? { createdAt: { gte: startDate } } : {};
+    const dateBounds = getDateBounds(range);
+    const dateFilter = Object.keys(dateBounds).length > 0 ? { createdAt: dateBounds } : {};
 
     try {
         const members = await prisma.member.findMany({
@@ -418,32 +428,17 @@ export async function getMembershipDistribution(range: string = "30d") {
     }
 }
 
-/**
- * 🏛️ BI ENGINE: Proactive Churn & Re-engagement Prediction
- * Updated: Now captures "Recent Expirations" (last 48h) even if status is INACTIVE,
- * alongside "Upcoming Expirations" (next 3 days) for ACTIVE members.
- */
 export async function getChurnRiskMembers() {
     try {
         const now = new Date();
-
-        // 1. Define the "Golden Windows"
         const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
         const fortyEightHoursAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
 
         const atRisk = await prisma.member.findMany({
             where: {
                 OR: [
-                    // Group A: About to leave (next 3 days)
-                    {
-                        status: "ACTIVE",
-                        activeUntil: { lt: threeDaysFromNow }
-                    },
-                    // Group B: Recently left (last 48 hours)
-                    {
-                        status: "INACTIVE",
-                        activeUntil: { gte: fortyEightHoursAgo, lt: now }
-                    }
+                    { status: "ACTIVE", activeUntil: { lt: threeDaysFromNow } },
+                    { status: "INACTIVE", activeUntil: { gte: fortyEightHoursAgo, lt: now } }
                 ]
             },
             take: 5,
@@ -454,7 +449,6 @@ export async function getChurnRiskMembers() {
             const activeUntil = member.activeUntil ? new Date(member.activeUntil) : new Date();
             const diffTime = activeUntil.getTime() - now.getTime();
 
-            // 🏛️ Same logic used in your report page
             const diffDays = diffTime > 0
                 ? Math.floor(diffTime / (1000 * 60 * 60 * 24))
                 : Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -463,7 +457,6 @@ export async function getChurnRiskMembers() {
 
             let riskStatus = "";
             if (isExpired) {
-                // Show "Expired X hours ago" if within today, otherwise "1 Day"
                 const absDiffHours = Math.floor(Math.abs(diffTime) / (1000 * 60 * 60));
                 if (absDiffHours < 24) {
                     riskStatus = `Expired ${absDiffHours}h ago`;
@@ -538,10 +531,6 @@ export async function getMemberById(id: string) {
  * ---------------------------------------------------------------------------
  */
 
-/**
- * 🏛️ ANALYTICS ENGINE: Retention Diagnostic Report
- * Fixed: TypeScript 'No overload matches' error by explicitly narrowing null values.
- */
 export async function getRetentionReportData() {
     try {
         const now = new Date();
@@ -589,7 +578,7 @@ export async function getRetentionReportData() {
             return {
                 id: member.id,
                 name: member.name,
-                email: member.email, // 🏛️ ADDED: Passing email through for the Contact button
+                email: member.email,
                 inactivityLabel,
                 riskLevel,
                 isExpired,
@@ -597,7 +586,6 @@ export async function getRetentionReportData() {
             };
         });
 
-        // 🏛️ Clean serialization for Next.js Server Components
         return JSON.parse(JSON.stringify(reportData));
     } catch (error) {
         console.error("RETENTION_REPORT_QUERY_ERROR:", error);

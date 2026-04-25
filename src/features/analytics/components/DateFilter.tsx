@@ -19,7 +19,10 @@ export function DateFilter() {
         router.refresh();
     };
 
+    // 🏛️ Added "Today" and "Yesterday" to the top of the array
     const options = [
+        { label: "Yesterday", value: "yesterday" },
+        { label: "Today", value: "today" },
         { label: "Last 7 Days", value: "7d" },
         { label: "Last 30 Days", value: "30d" },
         { label: "Last 90 Days", value: "90d" },
@@ -27,11 +30,11 @@ export function DateFilter() {
     ];
 
     return (
-        <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl p-1 shadow-sm">
-            <div className="pl-3 pr-2 flex items-center justify-center border-r border-zinc-800">
+        <div className="flex flex-wrap items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl p-1 shadow-sm">
+            <div className="pl-3 pr-2 hidden sm:flex items-center justify-center border-r border-zinc-800">
                 <Calendar className="w-3.5 h-3.5 text-zinc-500" />
             </div>
-            <div className="flex items-center">
+            <div className="flex flex-wrap items-center">
                 {options.map((option) => (
                     <button
                         key={option.value}

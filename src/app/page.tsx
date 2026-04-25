@@ -296,7 +296,8 @@ export default async function Home(props: {
             <TierDistributionChart data={passDistribution} />
           </div>
           <div className="space-y-8">
-            <PeakHoursChart data={peakHours} />
+            {/* 🏛️ FIX: Hand the range data to the chart */}
+            <PeakHoursChart data={peakHours} range={range} />
             <ChurnRiskList members={churnRisk} />
           </div>
         </div>
