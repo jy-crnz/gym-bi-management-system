@@ -35,9 +35,10 @@ export function PaymentButton({ memberId }: { memberId: string }) {
 
     return (
         <>
+            {/* 🏛️ TRIGGER BUTTON: Synchronized with CheckInButton for seamless UI */}
             <button
                 onClick={() => setIsOpen(true)}
-                className="text-[10px] font-black px-4 py-1.5 rounded-xl transition-all active:scale-95 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500 hover:text-zinc-950 uppercase tracking-widest"
+                className="w-full text-[10px] font-black px-4 py-2.5 rounded-xl transition-all active:scale-95 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500 hover:text-zinc-950 uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
             >
                 PAY
             </button>

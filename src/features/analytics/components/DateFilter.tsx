@@ -30,16 +30,19 @@ export function DateFilter() {
     ];
 
     return (
-        <div className="flex flex-wrap items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl p-1 shadow-sm">
-            <div className="pl-3 pr-2 hidden sm:flex items-center justify-center border-r border-zinc-800">
+        <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-1 shadow-sm overflow-hidden">
+            {/* Calendar Icon - Hidden on very small mobile to save even more space */}
+            <div className="pl-3 pr-2 hidden md:flex items-center justify-center border-r border-zinc-800">
                 <Calendar className="w-3.5 h-3.5 text-zinc-500" />
             </div>
-            <div className="flex flex-wrap items-center">
+
+            {/* 🏛️ UI FIX: flex-nowrap + overflow-x-auto allows swiping on mobile */}
+            <div className="flex flex-nowrap items-center overflow-x-auto scrollbar-hide px-1 gap-1">
                 {options.map((option) => (
                     <button
                         key={option.value}
                         onClick={() => handleFilterChange(option.value)}
-                        className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg transition-all ${currentRange === option.value
+                        className={`whitespace-nowrap px-3 py-2 text-[10px] font-bold uppercase tracking-widest rounded-lg transition-all shrink-0 ${currentRange === option.value
                                 ? "bg-zinc-800 text-white shadow-sm"
                                 : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
                             }`}

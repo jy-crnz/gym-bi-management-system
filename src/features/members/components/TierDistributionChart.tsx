@@ -25,25 +25,31 @@ export function TierDistributionChart({ data }: { data: TierData[] }) {
         return () => clearTimeout(timer);
     }, []);
 
-    // Loading State: 🏛️ FIX: Stripped bg-white and dark: classes. Locked to bg-zinc-900.
+    // 1. SKELETON STATE: 🏛️ FIX: Matches new responsive heights and padding
     if (!isMounted) {
         return (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 h-80 animate-pulse flex items-center justify-center">
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 sm:p-6 h-80 sm:h-92.5 w-full animate-pulse flex items-center justify-center">
                 <div className="w-32 h-32 rounded-full border-8 border-zinc-800" />
             </div>
         );
     }
 
     return (
-        /* 🏛️ FIX: Locked container to bg-zinc-900 / border-zinc-800 permanently */
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm h-80 flex flex-col transition-all hover:border-zinc-700">
-            <h3 className="font-bold text-zinc-200 mb-1">Membership Tiers</h3>
-            <p className="text-[11px] text-zinc-500 uppercase tracking-widest font-medium mb-4">
-                Segment Distribution
-            </p>
+        /* 🏛️ FIX: Upgraded to rounded-2xl, responsive padding, and dynamic height */
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 sm:p-6 shadow-sm w-full h-80 sm:h-92.5 flex flex-col transition-all hover:border-zinc-700">
+
+            {/* 🏛️ RESPONSIVE HEADER: Centered on mobile, side-by-side on PC */}
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mb-4 sm:mb-6 text-center sm:text-left">
+                <h3 className="text-lg sm:text-xl font-black text-zinc-100 uppercase italic tracking-tight">
+                    Membership Tiers
+                </h3>
+                <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest bg-zinc-950 border border-zinc-800 px-3 py-1.5 rounded-lg">
+                    Segment Distribution
+                </span>
+            </div>
 
             <div className="flex-1 w-full min-h-0">
-                <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }} >
+                <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
                     <PieChart>
                         <Pie
                             data={data}
@@ -72,15 +78,15 @@ export function TierDistributionChart({ data }: { data: TierData[] }) {
                                 fontSize: '12px',
                                 boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.5)'
                             }}
-                            itemStyle={{ color: '#f4f4f5' }}
+                            itemStyle={{ color: '#f4f4f5', fontWeight: 'bold' }}
                         />
                         <Legend
                             verticalAlign="bottom"
                             align="center"
                             iconType="circle"
                             formatter={(value) => (
-                                /* 🏛️ FIX: Standardized legend text color for dark mode */
-                                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-tighter">
+                                /* 🏛️ FIX: Standardized legend text color */
+                                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-tighter ml-1">
                                     {value}
                                 </span>
                             )}

@@ -121,14 +121,14 @@ export default async function Home(props: {
 }) {
   const searchParams = await props.searchParams;
 
-  // 1. Extract ALL parameters
+  // 1. Extract ALL parameters (Ensures Contextual Integrity)
   const range = (searchParams?.range as string) || "30d";
   const query = (searchParams?.q as string) || "";
   const status = (searchParams?.status as string) || undefined;
   const passType = (searchParams?.passType as string) || (searchParams?.tier as string) || undefined;
   const page = Number(searchParams?.page) || 1;
 
-  // 2. Optimized Parallel Execution
+  // 2. Parallel Data Hydration
   const [
     stats,
     financials,
@@ -157,55 +157,62 @@ export default async function Home(props: {
   return (
     <div className="flex flex-col min-h-screen bg-zinc-950 font-sans selection:bg-emerald-500/30">
 
-      {/* ── HEADER ──────────────────────────────────────────────────────── */}
+      {/* ── HEADER (Responsive & Sticky) ────────────────────────────────── */}
       <header className="sticky top-0 z-30 w-full bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]">
-              <DumbbellIcon className="w-4 h-4 text-zinc-950" />
+        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-2">
+          {/* Logo Section */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <div className="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+              <DumbbellIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-zinc-950" />
             </div>
             <div className="leading-none">
-              <p className="text-base font-black text-white tracking-tight">
+              <p className="text-sm sm:text-base font-black text-white tracking-tight">
                 Iron<span className="text-emerald-400">BI</span>
               </p>
-              <p className="text-[9px] text-zinc-500 uppercase tracking-[0.15em] font-bold mt-0.5">Terminal</p>
+              {/* Kind Architecture: Hide 'Terminal' text on very small mobile */}
+              <p className="hidden xs:block text-[8px] sm:text-[9px] text-zinc-500 uppercase tracking-[0.15em] font-bold mt-0.5">Terminal</p>
             </div>
           </div>
 
-          <div className="hidden sm:block">
+          <div className="hidden lg:block">
             <LivePill />
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          {/* Action Bar (Icon-only on mobile via child components) */}
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             <QRScanner />
             <ExportReportButton
               data={{ stats, tiers: passDistribution }}
               range={range}
             />
-            <div className="hidden md:block w-px h-5 bg-zinc-800 mx-2" />
+            <div className="hidden sm:block w-px h-5 bg-zinc-800 mx-1 sm:mx-2" />
             <SignOutButton />
           </div>
         </div>
       </header>
 
       {/* ── MAIN ────────────────────────────────────────────────────────── */}
-      <main className="flex-1 w-full max-w-6xl mx-auto px-6 py-10">
+      <main className="flex-1 w-full max-w-6xl mx-auto px-4 py-6 sm:py-10">
 
-        <div className="mb-10 flex flex-col sm:flex-row sm:items-end justify-between gap-6">
+        <div className="mb-8 flex flex-col lg:flex-row lg:items-end justify-between gap-6">
           <div>
-            <h1 className="text-3xl font-black text-white tracking-tight">Command Center</h1>
-            <p className="text-sm text-zinc-500 mt-1.5">Real-time operations and revenue intelligence.</p>
+            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">Command Center</h1>
+            <p className="text-xs sm:text-sm text-zinc-500 mt-1.5">Real-time operations and revenue intelligence.</p>
           </div>
-          <DateFilter />
+          {/* Filter Container: Stretches on mobile */}
+          <div className="w-full lg:w-auto">
+            <DateFilter />
+          </div>
         </div>
 
-        {/* ZONE 1: EXECUTIVE PULSE */}
+        {/* ZONE 1: EXECUTIVE PULSE (Responsive Grid) */}
         <SectionDivider label="Executive Pulse" />
         <StatsGrid
           total={stats.totalMembers}
           active={stats.activeMembers}
           today={stats.todayAttendance}
           revenue={stats.totalRevenue}
+          range={range}
         />
         <FinancialHealth arpu={financials.arpu} cltv={financials.cltv} />
 
@@ -213,7 +220,8 @@ export default async function Home(props: {
         <SectionDivider label="Operations Desk" />
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
 
-          <div className="xl:col-span-4 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6 xl:sticky xl:top-24">
+          {/* Registration Section (Stacked on mobile, 33% on desktop) */}
+          <div className="xl:col-span-4 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5 sm:p-6 xl:sticky xl:top-24">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center">
                 <span className="text-emerald-400 font-bold text-lg">+</span>
@@ -226,63 +234,78 @@ export default async function Home(props: {
             <RegistrationForm />
           </div>
 
-          <div className="xl:col-span-8 rounded-2xl border border-zinc-800 bg-zinc-900/50 relative">
-            <div className="px-6 py-4 flex items-center justify-between bg-zinc-900 rounded-t-2xl border-b border-zinc-800">
-              <div>
-                <h3 className="text-sm font-bold text-zinc-100">Live Directory</h3>
-                <p className="text-[10px] text-zinc-500 mt-0.5">Search and manage active members</p>
+          {/* Directory Section (Stacked on mobile, 66% on desktop) */}
+          <div className="xl:col-span-8 rounded-2xl border border-zinc-800 bg-zinc-900/50 relative overflow-hidden shadow-sm transition-all hover:border-zinc-700">
+
+            {/* 🏛️ RESPONSIVE FIX: flex-col + items-center centers everything on mobile. sm:flex-row + justify-between splits them on PC. */}
+            <div className="px-4 sm:px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-4 bg-zinc-900 rounded-t-2xl border-b border-zinc-800">
+
+              {/* 🏛️ TYPOGRAPHY FIX: text-center for mobile, text-left for PC */}
+              <div className="flex flex-col items-center sm:items-start text-center sm:text-left">
+                <h3 className="text-xl sm:text-2xl font-black text-white uppercase italic tracking-tight leading-none">
+                  Live Directory
+                </h3>
+                <p className="text-xs sm:text-sm text-zinc-400 mt-2 font-medium">
+                  Search and manage active members
+                </p>
               </div>
-              <span className="text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1.5 rounded-full">
+
+              {/* 🏛️ BADGE FIX: shrink-0 + whitespace-nowrap prevents crushing, updated to match IronBI glow styling */}
+              <span className="shrink-0 whitespace-nowrap text-[10px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-4 py-1.5 rounded-full uppercase tracking-[0.2em] shadow-[0_0_15px_rgba(16,185,129,0.1)]">
                 {metadata.total} Matches
               </span>
+
             </div>
 
             <DirectoryControls totalPages={metadata.totalPages} currentPage={metadata.currentPage} />
 
-            <div className="xl:overflow-visible overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead>
-                  <tr className="text-[9px] font-black uppercase tracking-[0.15em] text-zinc-500 bg-zinc-950/50">
-                    <th className="px-6 py-3">Member Details</th>
-                    <th className="px-4 py-3 text-center relative z-0">Account Status</th>
-                    <th className="px-6 py-3 text-right">Terminal Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-800/50">
-                  {members.length === 0 ? (
-                    <tr>
-                      <td colSpan={3} className="px-6 py-12 text-center text-zinc-500">No members found.</td>
+            {/* Kind Architecture: Horizontal scroll container for the table */}
+            <div className="w-full overflow-x-auto scrollbar-hide">
+              <div className="min-w-162.5 lg:min-w-0">
+                <table className="w-full text-sm text-left">
+                  <thead>
+                    <tr className="text-[9px] font-black uppercase tracking-[0.15em] text-zinc-500 bg-zinc-950/50">
+                      <th className="px-6 py-3">Member Details</th>
+                      <th className="px-4 py-3 text-center">Account Status</th>
+                      <th className="px-6 py-3 text-right">Terminal Actions</th>
                     </tr>
-                  ) : (
-                    members.map((member: SerializedMember) => (
-                      <tr key={member.id} className="hover:bg-zinc-800/40 transition-colors group">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <MemberAvatar name={member.name} />
-                            <div className="flex flex-col gap-1 min-w-0">
-                              <Link href={`/members/${member.id}`} className="font-semibold text-zinc-100 hover:text-emerald-400 transition-colors truncate text-sm">
-                                {member.name}
-                              </Link>
-                              <PassBadge type={member.passType} />
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-4">
-                          <div className="flex justify-center">
-                            <StatusEditor memberId={member.id} currentStatus={member.status} />
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex justify-end gap-2 opacity-90 group-hover:opacity-100 transition-opacity">
-                            <CheckInButton memberId={member.id} />
-                            <PaymentButton memberId={member.id} />
-                          </div>
-                        </td>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/50">
+                    {members.length === 0 ? (
+                      <tr>
+                        <td colSpan={3} className="px-6 py-12 text-center text-zinc-500 font-medium">No members found in this cluster.</td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : (
+                      members.map((member: SerializedMember) => (
+                        <tr key={member.id} className="hover:bg-zinc-800/40 transition-colors group">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <MemberAvatar name={member.name} />
+                              <div className="flex flex-col gap-1 min-w-0">
+                                <Link href={`/members/${member.id}`} className="font-semibold text-zinc-100 hover:text-emerald-400 transition-colors truncate text-sm">
+                                  {member.name}
+                                </Link>
+                                <PassBadge type={member.passType} />
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="flex justify-center">
+                              <StatusEditor memberId={member.id} currentStatus={member.status} />
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex justify-end gap-2 opacity-90 group-hover:opacity-100 transition-opacity">
+                              <CheckInButton memberId={member.id} />
+                              <PaymentButton memberId={member.id} />
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
@@ -296,27 +319,31 @@ export default async function Home(props: {
             <TierDistributionChart data={passDistribution} />
           </div>
           <div className="space-y-8">
-            {/* 🏛️ FIX: Hand the range data to the chart */}
             <PeakHoursChart data={peakHours} range={range} />
             <ChurnRiskList members={churnRisk} />
           </div>
         </div>
 
-        {/* 🏛️ ZONE 4: SECURITY & AUDIT (NEW FEATURE) */}
+        {/* ZONE 4: SECURITY & AUDIT (INFORMATION ASSURANCE) */}
         <SectionDivider label="Information Assurance" />
-        <div className="mb-12 h-112.5">
+        <div className="mb-12 h-96 sm:h-112.5">
           <SystemActivityFeed />
         </div>
 
         {/* ZONE 5: RETENTION ANALYTICS */}
         <SectionDivider label="Long-term Retention" />
-        <CohortMatrix data={cohortData} />
+        {/* Scrollable container for the matrix */}
+        <div className="overflow-x-auto pb-6 scrollbar-hide">
+          <div className="min-w-200 lg:min-w-0">
+            <CohortMatrix data={cohortData} />
+          </div>
+        </div>
 
       </main>
 
       {/* --- FOOTER --- */}
       <footer className="w-full border-t border-zinc-800 mt-12 bg-zinc-950/50">
-        <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-6 sm:gap-4">
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center w-6 h-6 rounded bg-emerald-500/20 text-emerald-500">
               <DumbbellIcon className="w-3 h-3" />

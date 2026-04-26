@@ -284,27 +284,48 @@ export async function getFinancialHealth(range: string = "30d") {
  */
 
 export async function getRevenueTrend(range: string = "30d") {
+    // 1. Get the start/end dates based on the range (7d, 30d, etc.)
     const dateBounds = getDateBounds(range);
     const dateFilter = Object.keys(dateBounds).length > 0 ? { createdAt: dateBounds } : {};
 
     try {
+        // 2. Fetch transactions from the database
         const transactions = await prisma.transaction.findMany({
             where: dateFilter,
             orderBy: { createdAt: 'asc' },
         });
 
-        const trendMap = new Map();
+        // 3. The BI Aggregation Engine
+        const trendMap = new Map<string, number>();
+
         transactions.forEach((tx) => {
-            const date = new Date(tx.createdAt).toLocaleDateString('en-US', {
-                month: 'short', day: 'numeric'
+            /** * 🌍 THE TIMEZONE FIX:
+             * We force the date to be interpreted in Asia/Manila time.
+             * This ensures that early morning PH transactions don't fall into the "Yesterday" bucket.
+             */
+            const dateKey = new Date(tx.createdAt).toLocaleDateString('en-US', {
+                timeZone: 'Asia/Manila',
+                month: 'short',
+                day: 'numeric'
             });
-            const current = trendMap.get(date) || 0;
-            trendMap.set(date, current + Number(tx.amount));
+
+            // 💰 Sum the amounts (casting Decimal to Number)
+            const currentTotal = trendMap.get(dateKey) || 0;
+            trendMap.set(dateKey, currentTotal + Number(tx.amount));
         });
 
-        return Array.from(trendMap, ([date, amount]) => ({ date, amount }));
+        /**
+         * 📊 FORMAT FOR RECHARTS/UI:
+         * Returns an array of { date: "Apr 1", amount: 5040 }
+         */
+        return Array.from(trendMap, ([date, amount]) => ({
+            date,
+            amount: Number(amount.toFixed(2)) // Clean up any float decimals
+        }));
+
     } catch (error) {
-        console.error("TREND_ERROR:", error);
+        // 📜 SYSTEM LOGGING: Architecture is kindness to your future debugger self.
+        console.error("[BI_ENGINE] REVENUE_TREND_ERROR:", error);
         return [];
     }
 }
@@ -519,8 +540,16 @@ export async function getMemberById(id: string) {
 
         if (!member) return null;
 
+        // 🏛️ BI ENGINE: Calculate the Lifetime Value (LTV) 
+        // by summing up every transaction in the database for this member.
+        const calculatedLTV = member.transactions.reduce((sum, tx) => {
+            return sum + Number(tx.amount || 0);
+        }, 0);
+
+        // We return the calculated sum as 'totalSpent' so your UI doesn't have to change!
         return JSON.parse(JSON.stringify({
             ...member,
+            totalSpent: calculatedLTV, // 🚀 This overrides the DB column with the real sum
             churnRiskScore: calculateRisk(member.activeUntil)
         }));
     } catch (error) {

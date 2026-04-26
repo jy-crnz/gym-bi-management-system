@@ -60,29 +60,46 @@ export function PeakHoursChart({ data, range = "30d" }: { data: PeakHourData[], 
 
     const { title, tooltip } = getChartTitles(range);
 
-    // 1. SKELETON STATE
+    // 🏛️ ANTI-CLIPPING LOGIC: K-Formatter for large check-in numbers
+    const formatYAxis = (value: number) => {
+        if (value >= 1000) {
+            return `${(value / 1000).toFixed(value % 1000 === 0 ? 0 : 1)}k`;
+        }
+        return `${value}`;
+    };
+
+    // 1. SKELETON STATE: Matches the new responsive heights
     if (!isMounted) {
         return (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm w-full h-75 animate-pulse flex items-center justify-center">
-                <div className="w-full h-32 bg-zinc-800 rounded-lg" />
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 sm:p-6 shadow-sm w-full h-80 sm:h-92.5 animate-pulse flex flex-col gap-6">
+                <div className="w-1/2 h-8 bg-zinc-800 rounded-lg" />
+                <div className="w-full flex-1 bg-zinc-800/50 rounded-lg" />
             </div>
         );
     }
 
+    // Filter to only show active gym hours (5 AM to 11 PM)
     const relevantData = data.filter((h: any) => h.rawHour >= 5 && h.rawHour <= 23);
 
     return (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm w-full h-75 min-h-0">
-            <div className="flex justify-between items-center mb-6">
+        /* 🏛️ FIX: Upgraded to rounded-2xl and responsive padding */
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 sm:p-6 shadow-sm w-full">
+
+            {/* 🏛️ RESPONSIVE HEADER: Centered on mobile, side-by-side on PC */}
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mb-6 sm:mb-8 text-center sm:text-left">
                 {/* 🏛️ Dynamic Title Rendered Here */}
-                <h3 className="font-bold text-zinc-200">{title}</h3>
-                <span className="text-[10px] text-zinc-500 font-medium uppercase tracking-widest">Utilization Insights</span>
+                <h3 className="text-lg sm:text-xl font-black text-zinc-100 uppercase italic tracking-tight">{title}</h3>
+                <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest bg-zinc-950 border border-zinc-800 px-3 py-1.5 rounded-lg">
+                    Utilization Insights
+                </span>
             </div>
 
-            <div className="w-full h-55 min-h-0">
+            {/* 🏛️ RESPONSIVE HEIGHT: Shorter on mobile so users don't get trapped scrolling */}
+            <div className="w-full h-55 sm:h-70">
                 {isMounted ? (
                     <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
-                        <BarChart data={relevantData} barGap={0} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                        {/* 🏛️ MARGIN FIX: left: 0 ensures the SVG never draws outside the box and clips the text */}
+                        <BarChart data={relevantData} barGap={0} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                             <CartesianGrid
                                 strokeDasharray="3 3"
                                 vertical={false}
@@ -92,16 +109,21 @@ export function PeakHoursChart({ data, range = "30d" }: { data: PeakHourData[], 
                                 dataKey="formattedHour"
                                 axisLine={false}
                                 tickLine={false}
-                                tick={{ fill: '#71717a', fontSize: 10, fontWeight: 500 }}
-                                interval={1}
+                                tick={{ fill: '#71717a', fontSize: 9, fontWeight: 500 }}
                                 dy={10}
+                                /* 🏛️ ANTI-COLLISION FIX: Drops overlapping hourly labels on mobile automatically */
+                                minTickGap={15}
+                            /* REMOVED interval={1} so minTickGap can do its job properly */
                             />
+                            {/* 🏛️ Y-AXIS FIX: Fixed width and K-formatter applied to prevent text cutoff */}
                             <YAxis
                                 axisLine={false}
                                 tickLine={false}
                                 tick={{ fill: '#71717a', fontSize: 10, fontWeight: 500 }}
+                                tickFormatter={formatYAxis}
                                 allowDecimals={false}
-                                dx={-10}
+                                width={35}
+                                dx={-5}
                             />
 
                             {/* 🏛️ Dynamic Tooltip Prop Passed Here */}

@@ -31,8 +31,12 @@ export function CheckInButton({ memberId }: { memberId: string }) {
     <button
       onClick={handleCheckIn}
       disabled={loading}
-      /* 🏛️ FIX: Stripped light mode. Locked to bg-blue-900/20 with a subtle hover boost */
-      className="text-[10px] font-bold px-4 py-1.5 rounded-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed bg-blue-900/20 text-blue-400 hover:bg-blue-900/40"
+      /* * 🏛️ ARCHITECTURE UPDATE (Responsive Fix): 
+       * 1. w-full: Forces the button to fill the flex container, eliminating dead space.
+       * 2. py-2.5: Increases the touch target height for better 'gym floor' usability.
+       * 3. focus:ring: Added focus indicators for accessibility compliance.
+       */
+      className="w-full text-[10px] font-bold px-4 py-2.5 rounded-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed bg-blue-900/20 text-blue-400 hover:bg-blue-900/40 focus:outline-none focus:ring-2 focus:ring-blue-500/40 uppercase tracking-widest"
     >
       {loading ? "LOGGING..." : "CHECK IN"}
     </button>

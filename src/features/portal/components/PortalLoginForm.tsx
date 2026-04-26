@@ -30,8 +30,6 @@ export function PortalLoginForm() {
         e.preventDefault();
 
         // 🏛️ STEP 1: THE "HARD" URL RESET
-        // This clears the ?error=... from the URL instantly without a page reload.
-        // This prevents Next-Auth from seeing the old error during the login attempt.
         if (typeof window !== "undefined") {
             window.history.replaceState({}, "", window.location.pathname);
         }
@@ -57,16 +55,13 @@ export function PortalLoginForm() {
                 email,
                 flow: "member",
                 redirect: false,
-                // Hard-coding the callback to be clean
                 callbackUrl: `/portal/${check.memberId}`,
             });
 
             if (res?.error) {
-                // If it fails here, it's a real credential failure
                 setLocalError("Verification failed. Please try again.");
                 setIsPending(false);
             } else {
-                // SUCCESS: Force a full navigation to clear all states
                 router.refresh();
                 window.location.href = `/portal/${check.memberId}`;
             }
@@ -81,26 +76,29 @@ export function PortalLoginForm() {
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-            className="relative w-full"
+            className="relative w-full max-w-md mx-auto" // 🏛️ Added max-w-md and mx-auto so it doesn't stretch infinitely on wide screens
         >
             {/* ── HEADER ── */}
-            <div className="mb-8">
+            {/* 🏛️ ALIGNMENT FIX: Added flex-col and items-center to perfectly center the badge and text on all screens */}
+            <div className="mb-8 flex flex-col items-center text-center w-full">
+
                 <motion.div
-                    className="inline-flex items-center gap-2 px-3 py-1.5 mb-5 rounded-full border border-emerald-500/20 bg-emerald-500/5 shadow-[0_0_15px_rgba(16,185,129,0.1)]"
+                    className="inline-flex items-center gap-2 px-3 py-1.5 mb-4 sm:mb-5 rounded-full border border-emerald-500/20 bg-emerald-500/5 shadow-[0_0_15px_rgba(16,185,129,0.1)]"
                 >
                     <span className="relative flex h-1.5 w-1.5">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                         <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
                     </span>
-                    <span className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em]">
+                    <span className="text-[9px] sm:text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em]">
                         System Online
                     </span>
                 </motion.div>
 
+                {/* 🏛️ TYPOGRAPHY: Centered text tracking */}
                 <motion.h1
-                    className="text-[2.75rem] font-black leading-[0.9] tracking-[-0.05em] text-white mb-0 whitespace-nowrap italic uppercase"
+                    className="text-4xl sm:text-[2.75rem] font-black leading-none tracking-tighter text-white mb-0 italic uppercase"
                 >
-                    Member <span className="text-emerald-400">Portal</span>
+                    Member <span className="text-emerald-400 block sm:inline">Portal</span>
                 </motion.h1>
             </div>
 
@@ -108,10 +106,10 @@ export function PortalLoginForm() {
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                     <div className="flex items-center justify-between mb-2 px-1">
-                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em]">
+                        <label className="text-[9px] sm:text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em]">
                             Email
                         </label>
-                        <span className="text-[9px] text-zinc-700 font-bold uppercase tracking-widest">
+                        <span className="text-[8px] sm:text-[9px] text-zinc-700 font-bold uppercase tracking-widest">
                             Verified Only
                         </span>
                     </div>
@@ -135,7 +133,8 @@ export function PortalLoginForm() {
                             placeholder="yourname@email.com"
                             onFocus={() => setIsFocused(true)}
                             onBlur={() => setIsFocused(false)}
-                            className="w-full h-14 bg-transparent px-3 text-sm font-medium text-white placeholder:text-zinc-700 outline-none"
+                            /* 🏛️ Input text sized slightly larger on mobile to prevent iOS auto-zoom */
+                            className="w-full h-12 sm:h-14 bg-transparent px-3 text-base sm:text-sm font-medium text-white placeholder:text-zinc-700 outline-none"
                         />
                     </div>
                 </div>
@@ -145,15 +144,17 @@ export function PortalLoginForm() {
                     {activeErrorMessage && (
                         <motion.div
                             key="error"
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            className="flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-red-500/5 border border-red-500/10"
+                            initial={{ opacity: 0, scale: 0.95, height: 0 }}
+                            animate={{ opacity: 1, scale: 1, height: "auto" }}
+                            exit={{ opacity: 0, scale: 0.95, height: 0 }}
+                            className="overflow-hidden"
                         >
-                            <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
-                            <p className="text-[11px] font-black text-red-500 uppercase tracking-widest leading-none">
-                                {activeErrorMessage}
-                            </p>
+                            <div className="flex items-center gap-3 px-4 py-3 sm:py-3.5 rounded-2xl bg-red-500/5 border border-red-500/10 mt-1">
+                                <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                                <p className="text-[10px] sm:text-[11px] font-black text-red-500 uppercase tracking-widest leading-relaxed">
+                                    {activeErrorMessage}
+                                </p>
+                            </div>
                         </motion.div>
                     )}
                 </AnimatePresence>
@@ -162,9 +163,9 @@ export function PortalLoginForm() {
                     type="submit"
                     disabled={isPending}
                     className="
-                        group relative w-full h-14 mt-2 rounded-2xl
+                        group relative w-full h-12 sm:h-14 mt-4 rounded-2xl
                         bg-white text-zinc-950
-                        font-black text-[12px] tracking-[0.2em] uppercase
+                        font-black text-[11px] sm:text-[12px] tracking-[0.2em] uppercase
                         transition-all duration-300 active:scale-[0.98]
                         hover:bg-emerald-400 hover:shadow-[0_0_25px_rgba(52,211,153,0.3)]
                         disabled:opacity-40 disabled:cursor-not-allowed
@@ -182,14 +183,14 @@ export function PortalLoginForm() {
                 </button>
             </form>
 
-            <div className="mt-10 pt-6 border-t border-zinc-900/50 flex items-center justify-between opacity-30">
+            <div className="mt-8 sm:mt-10 pt-5 sm:pt-6 border-t border-zinc-900/50 flex flex-col sm:flex-row items-center justify-between gap-3 opacity-30">
                 <div className="flex items-center gap-2.5">
                     <ShieldCheck className="w-4 h-4 text-zinc-500" />
-                    <span className="text-[9px] font-black text-zinc-500 tracking-[0.2em] uppercase">
+                    <span className="text-[8px] sm:text-[9px] font-black text-zinc-500 tracking-[0.2em] uppercase">
                         Secure Terminal
                     </span>
                 </div>
-                <span className="text-[10px] font-bold text-zinc-800 font-mono tracking-tighter">
+                <span className="text-[9px] sm:text-[10px] font-bold text-zinc-800 font-mono tracking-tighter">
                     v1.0.0
                 </span>
             </div>

@@ -40,7 +40,8 @@ export function DirectoryControls({ totalPages, currentPage }: { totalPages: num
 
             {/* SEARCH & FILTERS */}
             <div className="flex flex-col sm:flex-row gap-2 flex-1">
-                <div className="relative flex-1 max-w-sm">
+                {/* 🏛️ UI FIX: Changed max-w-sm to w-full sm:max-w-sm so it stretches on mobile */}
+                <div className="relative w-full sm:max-w-sm">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
                     <input
                         type="text"
@@ -55,7 +56,7 @@ export function DirectoryControls({ totalPages, currentPage }: { totalPages: num
                 <select
                     onChange={(e) => handleUpdateUrl("status", e.target.value)}
                     defaultValue={searchParams.get("status") || "ALL"}
-                    className="px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs font-black uppercase tracking-widest text-zinc-400 outline-none focus:border-emerald-500 cursor-pointer"
+                    className="px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs font-black uppercase tracking-widest text-zinc-400 outline-none focus:border-emerald-500 cursor-pointer w-full sm:w-auto"
                 >
                     <option value="ALL">All Status</option>
                     <option value="ACTIVE">Active</option>
@@ -63,11 +64,11 @@ export function DirectoryControls({ totalPages, currentPage }: { totalPages: num
                     <option value="CANCELLED">Cancelled</option>
                 </select>
 
-                {/* 🏛️ FIXED: Pass Type Filter (Replaced Tier) */}
+                {/* Pass Type Filter */}
                 <select
                     onChange={(e) => handleUpdateUrl("passType", e.target.value)}
                     defaultValue={searchParams.get("passType") || "ALL"}
-                    className="px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs font-black uppercase tracking-widest text-zinc-400 outline-none focus:border-emerald-500 cursor-pointer"
+                    className="px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs font-black uppercase tracking-widest text-zinc-400 outline-none focus:border-emerald-500 cursor-pointer w-full sm:w-auto"
                 >
                     <option value="ALL">All Passes</option>
                     <option value="DAY_PASS">Day Pass (₱30)</option>
@@ -76,24 +77,27 @@ export function DirectoryControls({ totalPages, currentPage }: { totalPages: num
             </div>
 
             {/* PAGINATION */}
-            <div className="flex items-center gap-2">
+            {/* 🏛️ UI FIX: justify-between on mobile so the arrows don't get squished */}
+            <div className="flex items-center justify-between sm:justify-start gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-zinc-800/50">
                 <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mr-2">
                     Page {currentPage} of {Math.max(1, totalPages)}
                 </span>
-                <button
-                    onClick={() => handleUpdateUrl("page", currentPage - 1)}
-                    disabled={currentPage <= 1}
-                    className="p-1.5 rounded-lg border border-zinc-800 bg-zinc-950 text-zinc-400 disabled:opacity-30 hover:bg-zinc-800 transition-all"
-                >
-                    <ChevronLeft className="w-4 h-4" />
-                </button>
-                <button
-                    onClick={() => handleUpdateUrl("page", currentPage + 1)}
-                    disabled={currentPage >= totalPages}
-                    className="p-1.5 rounded-lg border border-zinc-800 bg-zinc-950 text-zinc-400 disabled:opacity-30 hover:bg-zinc-800 transition-all"
-                >
-                    <ChevronRight className="w-4 h-4" />
-                </button>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => handleUpdateUrl("page", currentPage - 1)}
+                        disabled={currentPage <= 1}
+                        className="p-1.5 rounded-lg border border-zinc-800 bg-zinc-950 text-zinc-400 disabled:opacity-30 hover:bg-zinc-800 transition-all"
+                    >
+                        <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                        onClick={() => handleUpdateUrl("page", currentPage + 1)}
+                        disabled={currentPage >= totalPages}
+                        className="p-1.5 rounded-lg border border-zinc-800 bg-zinc-950 text-zinc-400 disabled:opacity-30 hover:bg-zinc-800 transition-all"
+                    >
+                        <ChevronRight className="w-4 h-4" />
+                    </button>
+                </div>
             </div>
         </div>
     );

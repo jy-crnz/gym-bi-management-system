@@ -2,19 +2,30 @@
 
 import { useState } from "react";
 import { deleteMember } from "../actions";
+import { Trash2, Loader2 } from "lucide-react";
 
+/**
+ * 🏛️ ENGINEERING STANDARD: Decommissioning Logic
+ * This handles the permanent erasure of a member asset.
+ * Responsive Note: w-full on mobile, sm:w-auto on PC to prevent stretching.
+ */
 export function DeleteMemberButton({ memberId }: { memberId: string }) {
     const [isDeleting, setIsDeleting] = useState(false);
 
     const handleDelete = async () => {
         const confirmed = confirm(
-            "WARNING: This will permanently remove all attendance and transaction history for this member. Proceed?"
+            "⚠️ CRITICAL WARNING: This operation will permanently erase all attendance records, financial transactions, and BI data for this member. This cannot be undone. Proceed?"
         );
 
         if (confirmed) {
             setIsDeleting(true);
-            await deleteMember(memberId);
-            // redirect is handled by the server action
+            try {
+                await deleteMember(memberId);
+                // The server action handles the redirect back to terminal
+            } catch (error) {
+                console.error("DELETION_ERROR:", error);
+                setIsDeleting(false);
+            }
         }
     };
 
@@ -22,12 +33,26 @@ export function DeleteMemberButton({ memberId }: { memberId: string }) {
         <button
             onClick={handleDelete}
             disabled={isDeleting}
-            /* 🏛️ FIX: Stripped light mode. Locked to border-red-900/30 and text-red-400 */
-            className="w-full py-3 border border-red-900/30 text-red-400 text-xs font-bold uppercase tracking-widest
-                 rounded-xl hover:bg-red-950/30 hover:border-red-500/50 transition-all
-                 disabled:opacity-50 disabled:cursor-wait"
+            /* 🏛️ RESPONSIVE FIX: 
+             * w-full: fills the red box on mobile.
+             * sm:w-64: prevents the button from stretching to infinity on PC.
+             * sm:px-8: adds horizontal breathing room on desktop.
+             */
+            className="w-full sm:w-64 sm:px-8 py-3.5 border border-red-900/30 text-red-400 text-[10px] font-black uppercase tracking-[0.2em]
+                 rounded-xl hover:bg-red-500/10 hover:border-red-500/50 transition-all active:scale-95
+                 disabled:opacity-50 disabled:cursor-wait flex items-center justify-center gap-2 group"
         >
-            {isDeleting ? "Wiping Data..." : "Delete Member Profile"}
+            {isDeleting ? (
+                <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Wiping Data...
+                </>
+            ) : (
+                <>
+                    <Trash2 className="w-3.5 h-3.5 group-hover:shake-animation" />
+                    Delete Member Profile
+                </>
+            )}
         </button>
     );
 }

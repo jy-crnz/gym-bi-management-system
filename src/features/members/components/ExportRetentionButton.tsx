@@ -47,11 +47,13 @@ export function ExportRetentionButton({ data }: { data: AtRiskMember[] }) {
     return (
         <button
             onClick={handleExport}
-            /* 🏛️ FIX: Locked to IronBI Zinc-900 theme and standardized typography */
-            className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 text-zinc-400 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 hover:text-white transition-all active:scale-95 shadow-sm"
+            /* 🏛️ FIX: Added w-full and whitespace-nowrap */
+            className="w-full flex items-center justify-center gap-2 bg-transparent text-zinc-500 px-2 sm:px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 hover:text-white transition-all active:scale-95 group"
         >
-            <Download className="w-3.5 h-3.5" />
-            Export CSV
+            <Download className="w-3.5 h-3.5 group-hover:translate-y-0.5 transition-transform" />
+            <span className="hidden sm:inline whitespace-nowrap">
+                Export
+            </span>
         </button>
     );
 }
