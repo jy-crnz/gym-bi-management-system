@@ -86,7 +86,7 @@ export default async function MemberProfile({
 
                     {/* Thumb-friendly Action Bar */}
                     <div className="flex items-center w-full md:w-auto bg-zinc-900/50 p-1 rounded-2xl border border-zinc-800/50">
-                        <div className="flex-1 md:w-32"> {/* flex-1 is the key here */}
+                        <div className="flex-1 md:w-32">
                             <CheckInButton memberId={member.id} />
                         </div>
                         <div className="w-px h-6 bg-zinc-800 mx-1" />
@@ -102,23 +102,22 @@ export default async function MemberProfile({
 
                     <div className="relative z-10 flex flex-col md:flex-row justify-between items-center md:items-center gap-6 sm:gap-8">
 
-                        {/* 🏛️ CENTERED CONTAINER: Uses items-center for mobile, items-start for desktop */}
+                        {/* 🏛️ CENTERED CONTAINER */}
                         <div className="flex flex-col sm:flex-row items-center sm:items-center gap-6 sm:gap-8 w-full sm:w-auto text-center sm:text-left">
 
-                            {/* 1. THE ICON: Added mx-auto for mobile centering */}
+                            {/* 1. THE ICON */}
                             <div className="relative shrink-0 mx-auto sm:mx-0">
                                 <div className="w-20 h-20 sm:w-24 sm:h-24 bg-zinc-800 rounded-2xl sm:rounded-3xl flex items-center justify-center border border-zinc-700 shadow-inner">
                                     <User className="w-10 h-10 sm:w-12 sm:h-12 text-zinc-500" />
                                 </div>
-                                {/* Status Dot: Adjusted position for centered avatar */}
                                 <div className={`absolute -bottom-1 -right-1 w-5 h-5 sm:w-6 sm:h-6 rounded-full border-4 border-zinc-900 shadow-lg ${statusIndicatorStyles[member.status]}`} />
                             </div>
 
                             {/* 2. THE TEXT CONTENT */}
                             <div className="min-w-0 flex-1 flex flex-col items-center sm:items-start">
-                                {/* Name & Badge: justify-center for mobile */}
                                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 mb-2">
-                                    <h1 className="text-2xl sm:text-4xl font-black tracking-tighter text-white uppercase italic truncate">
+                                    {/* Added pr-2 to prevent italic clipping */}
+                                    <h1 className="text-2xl sm:text-4xl font-black tracking-tighter text-white uppercase italic truncate pr-2">
                                         {member.name}
                                     </h1>
                                     <span className={`px-2 py-0.5 sm:px-3 sm:py-1 rounded-lg text-[9px] sm:text-[10px] font-black uppercase tracking-[0.15em] ${passStyles[member.passType]}`}>
@@ -126,7 +125,6 @@ export default async function MemberProfile({
                                     </span>
                                 </div>
 
-                                {/* Email & Expiration: items-center for mobile */}
                                 <div className="flex flex-col sm:flex-row items-center sm:items-center gap-2 sm:gap-4 text-zinc-500">
                                     <p className="flex items-center gap-1.5 text-xs sm:text-sm font-medium truncate">
                                         <Mail className="w-3.5 h-3.5" /> {member.email}
@@ -135,7 +133,7 @@ export default async function MemberProfile({
                                     <div className={`w-fit flex items-center gap-1.5 px-2 py-1 rounded-md border ${isExpired ? 'border-red-900/50 text-red-500 bg-red-500/5' : 'border-emerald-900/50 text-emerald-500 bg-emerald-500/5'}`}>
                                         <Clock className="w-3 h-3" />
                                         <span className="text-[9px] font-black uppercase tracking-widest">
-                                            {isExpired ? 'Expired' : `Ends: ${expiryDate?.toLocaleDateString()}`}
+                                            {isExpired ? 'Expired' : `Ends: ${expiryDate?.toLocaleDateString('en-US', { timeZone: 'Asia/Manila' })}`}
                                         </span>
                                     </div>
                                 </div>
@@ -161,7 +159,7 @@ export default async function MemberProfile({
                 {/* ── METRICS GRID ── */}
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 sm:gap-8">
                     <div className="lg:col-span-3 space-y-6 sm:space-y-8">
-                        
+
                         {/* LTV & Churn Cards */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                             <div className="bg-zinc-900 p-6 sm:p-8 rounded-3xl border border-zinc-800 group">
@@ -208,11 +206,20 @@ export default async function MemberProfile({
                                                 <div className="flex gap-3 sm:gap-4 items-center">
                                                     <div className="w-1 h-6 sm:h-8 bg-emerald-500/20 group-hover:bg-emerald-500 rounded-full transition-all" />
                                                     <div>
-                                                        <p className="text-xs sm:text-sm font-bold text-zinc-100">{new Date(log.checkIn).toLocaleDateString()}</p>
+                                                        <p className="text-xs sm:text-sm font-bold text-zinc-100">
+                                                            {new Date(log.checkIn).toLocaleDateString('en-US', { timeZone: 'Asia/Manila' })}
+                                                        </p>
                                                         <p className="text-[8px] sm:text-[9px] text-zinc-500 uppercase font-black tracking-widest">Standard Check-in</p>
                                                     </div>
                                                 </div>
-                                                <span className="text-[10px] sm:text-xs font-black text-zinc-500 font-mono">{new Date(log.checkIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                <span className="text-[10px] sm:text-xs font-black text-zinc-500 font-mono">
+                                                    {new Date(log.checkIn).toLocaleTimeString('en-US', {
+                                                        hour: '2-digit',
+                                                        minute: '2-digit',
+                                                        hour12: true,
+                                                        timeZone: 'Asia/Manila'
+                                                    })}
+                                                </span>
                                             </div>
                                         ))
                                     )}
@@ -233,7 +240,9 @@ export default async function MemberProfile({
                                                     <div className="w-1 h-6 sm:h-8 bg-blue-500/20 group-hover:bg-blue-500 rounded-full transition-all" />
                                                     <div>
                                                         <p className="text-xs sm:text-sm font-bold text-zinc-100 uppercase italic">{tx.type.replace('_', ' ')}</p>
-                                                        <p className="text-[8px] sm:text-[9px] text-zinc-500 uppercase font-black tracking-widest">{new Date(tx.createdAt).toLocaleDateString()}</p>
+                                                        <p className="text-[8px] sm:text-[9px] text-zinc-500 uppercase font-black tracking-widest">
+                                                            {new Date(tx.createdAt).toLocaleDateString('en-US', { timeZone: 'Asia/Manila' })}
+                                                        </p>
                                                     </div>
                                                 </div>
                                                 <span className="text-sm sm:text-lg font-black text-emerald-400 tracking-tighter">+₱{Number(tx.amount).toLocaleString()}</span>
@@ -268,7 +277,6 @@ export default async function MemberProfile({
 
                 {/* ── FOOTER DECOMMISSION ── */}
                 <footer className="pt-8 sm:pt-12 border-t border-zinc-800/50">
-                    {/* 🏛️ FIX: Added 'max-w-4xl mx-auto' to prevent the stretched look on PC */}
                     <div className="max-w-4xl mx-auto bg-red-950/10 border border-red-900/20 p-6 sm:p-8 rounded-3xl sm:rounded-4xl flex flex-col md:flex-row justify-between items-center gap-6 sm:gap-8 group hover:border-red-500/30 transition-all">
 
                         <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 text-center sm:text-left">
@@ -286,7 +294,6 @@ export default async function MemberProfile({
                             </div>
                         </div>
 
-                        {/* 🏛️ UI ADJUSTMENT: Added w-full md:w-auto to match the action bar logic */}
                         <div className="w-full md:w-auto">
                             <DeleteMemberButton memberId={id} />
                         </div>
