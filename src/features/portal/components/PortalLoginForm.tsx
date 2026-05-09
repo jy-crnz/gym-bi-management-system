@@ -55,15 +55,19 @@ export function PortalLoginForm() {
                 email,
                 flow: "member",
                 redirect: false,
-                callbackUrl: `/portal/${check.memberId}`,
             });
 
             if (res?.error) {
                 setLocalError("Verification failed. Please try again.");
                 setIsPending(false);
             } else {
+                // ── C. CACHE BUSTING FOR MOBILE BROWSERS ──
+                // Invalidate the client-side router cache so middleware runs fresh
                 router.refresh();
-                window.location.href = `/portal/${check.memberId}`;
+
+                // Use a timestamp to prevent iOS/Android from using a cached 307 redirect
+                const cacheBuster = Date.now();
+                router.push(`/portal/${check.memberId}?t=${cacheBuster}`);
             }
         } catch (err) {
             setLocalError("A system error occurred.");

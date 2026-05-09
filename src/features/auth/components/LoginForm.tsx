@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import Link from "next/link"; // Added for navigation
+import Link from "next/link";
 import { Lock, Mail, Loader2, AlertCircle, LockKeyhole, ChevronRight, UserCircle } from "lucide-react";
 
 export function LoginForm() {
@@ -21,19 +21,25 @@ export function LoginForm() {
         const password = formData.get("password") as string;
 
         try {
+            // ── A. THE HANDSHAKE (NextAuth) ──
             const res = await signIn("credentials", {
                 email,
                 password,
-                callbackUrl: "/",
+                // callbackUrl is removed here because we route manually below to bypass cache
                 redirect: false,
             });
 
             if (res?.error) {
                 setError(res.error === "CredentialsSignin" ? "Invalid credentials. Access denied." : res.error);
                 setIsLoading(false);
-            } else if (res?.url) {
+            } else {
+                // ── B. CACHE BUSTING FOR MOBILE BROWSERS ──
+                // 1. Invalidate Next.js client-side router cache
                 router.refresh();
-                router.push("/");
+
+                // 2. Cache-buster timestamp to defeat Mobile Safari/Chrome caching!
+                const cacheBuster = Date.now();
+                router.push(`/?t=${cacheBuster}`);
             }
         } catch (err) {
             setError("A system error occurred.");
